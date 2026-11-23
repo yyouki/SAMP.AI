@@ -13,7 +13,7 @@ SAMP.AI is intended to help server owners and developers design, inspect, previe
 - **Collaborative:** clarify requirements, present a plan and preview, accept revisions, and request approval from an authorized person.
 - **Proactive:** suggest useful improvements based on permitted project events and stored project context, with quiet hours and rate limits.
 - **Safe and reversible:** validate every operation, apply changes in bounded batches, keep revisions, and support rollback where the runtime supports it. Native GTA world-object removal has special undo limitations.
-- **Extensible:** allow community adapters, tools, model providers, object catalogs, and design templates.
+- **Extensible:** do not hard-code the AI to mapping and TextDraw. Allow new skills, typed tools, adapters, model providers, catalogs, and external integrations to expand its capabilities.
 
 ## What the AI should help with
 
@@ -38,6 +38,9 @@ SAMP.AI is intended to help server owners and developers design, inspect, previe
 - Suggest improvements without silently changing the server.
 - Track pending work and provide concise progress summaries.
 
+### Extensible development skills
+Mapping and TextDraw are initial skills, not the product boundary. Future skills may cover diagnostics, code and resource assistance, database planning, performance analysis, gameplay systems, NPCs, testing, documentation, and controlled deployment workflows. See [Extensibility and AI Autonomy](docs/EXTENSIBILITY_AND_AUTONOMY.md).
+
 ## High-level architecture
 
 ```text
@@ -49,7 +52,7 @@ Game server / editor adapter
              - planning and evaluation
              - permissions and approvals
              - model-provider interface
-             - mapping and TextDraw skills
+             - extensible skill and tool registry
         <-> validated action queue
         <-> game server
 ```
@@ -88,6 +91,7 @@ The AI may discuss, inspect, plan, and prepare drafts according to the user's pe
 - [Coordinate and marker workflow](docs/COORDINATES_AND_MARKERS.md)
 - [Native GTA world objects and undo/redo](docs/NATIVE_WORLD_OBJECTS.md)
 - [Roadmap](docs/ROADMAP.md)
+- [Extensibility and AI autonomy](docs/EXTENSIBILITY_AND_AUTONOMY.md)
 
 ## Contributing
 
