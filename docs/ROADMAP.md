@@ -12,7 +12,7 @@ This roadmap prioritizes a safe, testable end-to-end path before adding more ada
 ## Phase 1 — Protocol and test harness
 - [ ] Define JSON Schemas for message envelopes, coordinates, capabilities, drafts, operations, approvals, and execution results.
 - [ ] Implement protocol validation.
-- [ ] Build a mock adapter that can simulate player state, anchors, markers, object operations, and failures.
+- [ ] Build a mock adapter that can simulate player state, anchors, markers, server objects, native-world removal directives, and failures.
 - [ ] Add contract tests so every adapter must pass the same protocol suite.
 
 **Exit condition:** a mock server can connect, advertise capabilities, receive a validated draft, and return deterministic execution results.
@@ -33,19 +33,21 @@ This roadmap prioritizes a safe, testable end-to-end path before adding more ada
 - [ ] Capture interior and virtual-world context where available.
 - [ ] Create and clean up private preview markers.
 - [ ] Implement bounded object creation / deletion queues.
-- [ ] Return per-operation results.
+- [ ] Implement per-player native-world removal directives with session deduplication.
+- [ ] Return per-operation and per-player-session results.
 
-**Exit condition:** an admin can mark an anchor, request a small mapping draft, preview it, approve it, and apply it without blocking the server tick.
+**Exit condition:** an admin can mark an anchor, request a small mapping draft, preview it, approve it, and apply it without blocking the server tick. A native-world removal request must clearly disclose its player scope and undo limitations.
 
 ## Phase 4 — Mapping MVP
-- [ ] Build a curated object catalog with provenance.
+- [ ] Build a curated object catalog with provenance, including a native-map object index where licensing and source data permit.
 - [ ] Support anchor-relative layouts, offsets, rotation, spacing, and grid snapping.
 - [ ] Support object groups and reusable templates.
 - [ ] Validate model IDs, coordinate ranges, transforms, operation counts, and duplicates.
 - [ ] Add preview markers / ghost objects supported by the adapter.
-- [ ] Add revisions, undo, and restore.
+- [ ] Add revisions, undo, and restore for server-created objects.
+- [ ] Add explicit native-world removal history and reconnect/proxy compensation workflows; never claim exact native restore without runtime support.
 
-**Exit condition:** a small scene can be created, inspected, revised, approved, applied, and rolled back.
+**Exit condition:** a small scene can be created, inspected, revised, approved, applied, and rolled back. Native-world operations expose their actual recovery status.
 
 ## Phase 5 — TextDraw MVP
 - [ ] Define screen-space UI specification separately from world coordinates.
@@ -89,6 +91,7 @@ The protocol and conformance tests should lead; additional adapters should not i
 - Unrestricted shell, filesystem, or production database access.
 - Autonomous publishing or destructive changes without approval.
 - Promising exact world surface placement when an adapter cannot measure a surface hit.
+- Promising immediate exact undo for native-world removal through an API that does not provide a restore operation.
 - Supporting every language before one end-to-end adapter is reliable.
 
 ## Definition of done for a feature
