@@ -12,18 +12,19 @@ SAMP.AI is intended to help server owners and developers design, inspect, previe
 - **Coordinate-aware:** obtain positions and orientation from explicit server/editor context, calculate layouts relative to anchors, and show visual markers for review.
 - **Collaborative:** clarify requirements, present a plan and preview, accept revisions, and request approval from an authorized person.
 - **Proactive:** suggest useful improvements based on permitted project events and stored project context, with quiet hours and rate limits.
-- **Safe and reversible:** validate every operation, apply changes in bounded batches, keep revisions, and support rollback.
+- **Safe and reversible:** validate every operation, apply changes in bounded batches, keep revisions, and support rollback where the runtime supports it. Native GTA world-object removal has special undo limitations.
 - **Extensible:** allow community adapters, tools, model providers, object catalogs, and design templates.
 
 ## What the AI should help with
 
 ### Mapping
-- Create and arrange objects from natural-language descriptions.
+- Create and arrange server objects from natural-language descriptions.
+- Inspect and remove selected original GTA: San Andreas world objects where the adapter supports it.
 - Work from a captured player position, camera direction, selected point, or saved anchor.
 - Calculate positions, rotations, offsets, spacing, and object groups.
-- Mark proposed anchors, object positions, boundaries, and paths in-game.
+- Mark proposed anchors, object positions, native-object candidates, boundaries, and paths in-game.
 - Preview a draft before it is applied.
-- Inspect, edit, save, version, and restore mapping projects.
+- Inspect, edit, save, version, undo, redo, and restore mapping projects according to the capabilities of each object type.
 
 ### TextDraw
 - Design global TextDraw and player TextDraw layouts.
@@ -69,6 +70,12 @@ Every coordinate should carry its reference frame, interior/virtual-world contex
 
 See [Coordinate and Marker Workflow](docs/COORDINATES_AND_MARKERS.md).
 
+## Native GTA world objects
+
+SAMP.AI is planned to support removing original GTA map objects through adapter capabilities such as open.mp / SA-MP `RemoveBuildingForPlayer`. This operation is per player and matches a model ID within a radius; it is not the same as deleting a server-created object.
+
+**Native-world removal cannot be promised an immediate, exact undo.** The documented API has no corresponding native restore function. Depending on the adapter and saved object data, recovery may require reconnecting without reapplying the removal directive or showing an explicitly labelled replacement object. See [Native World Objects and Undo/Redo](docs/NATIVE_WORLD_OBJECTS.md).
+
 ## Safety model
 
 The AI may discuss, inspect, plan, and prepare drafts according to the user's permissions. Applying, deleting, publishing, or restoring content requires the relevant permission and approval policy. Model output is untrusted input: validate schemas, IDs, numeric ranges, object counts, and adapter capabilities before execution. Never execute model-generated Pawn/C++/shell code directly.
@@ -79,6 +86,7 @@ The AI may discuss, inspect, plan, and prepare drafts according to the user's pe
 - [Universal protocol](docs/PROTOCOL.md)
 - [AI behavior and permissions](docs/AI_BEHAVIOR.md)
 - [Coordinate and marker workflow](docs/COORDINATES_AND_MARKERS.md)
+- [Native GTA world objects and undo/redo](docs/NATIVE_WORLD_OBJECTS.md)
 - [Roadmap](docs/ROADMAP.md)
 
 ## Contributing
