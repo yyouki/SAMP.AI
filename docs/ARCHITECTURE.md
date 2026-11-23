@@ -25,16 +25,10 @@ Abstracts cloud and local model providers. The provider interface should support
 ### Project memory
 Stores structured project data: anchors, scene objects, TextDraw elements, requirements, approved decisions, revisions, and relevant conversation summaries. Memory must distinguish facts supplied by a user, measurements supplied by an adapter, estimates, and AI proposals.
 
-### Skills
-Examples:
-- Mapping planner
-- TextDraw designer
-- Coordinate resolver
-- Scene inspector
-- Layout evaluator
-- Project assistant
+### Skills and dynamic tool registry
+Skills are modular domain workflows, not a fixed list of product features. Initial examples include mapping planner, TextDraw designer, coordinate resolver, scene inspector, layout evaluator, and project assistant. Future contributors may add diagnostics, code/resource assistance, database planning, gameplay design, NPC tooling, testing, documentation, and other workflows.
 
-Skills should call typed tools rather than generate code for direct execution.
+A dynamic registry exposes only installed and enabled skills/tools that match the current adapter capabilities. Every tool declares its schema, permissions, data access, risk, resource limits, and undo/compensation behavior. Skills should call typed tools rather than generate code for direct execution. See [Extensibility and AI Autonomy](EXTENSIBILITY_AND_AUTONOMY.md).
 
 ### Permission and approval engine
 Evaluates the actor, permission, resource, project, and action. It also enforces approval rules and records who approved what revision.
@@ -44,6 +38,9 @@ Validates messages against versioned schemas, authenticates adapters, applies re
 
 ### Adapter
 Runs beside or inside the server integration. It advertises supported operations and limits, reads server/editor state, queues mutations safely, and returns execution results.
+
+### Extension manager
+Installs and manages community skills, tools, adapters, providers, catalogs, and UI extensions. Extensions declare dependencies, compatibility, permissions, and data access. Installation alone must not grant runtime permissions.
 
 ### Dashboard / in-game UI
 Provides chat, project browser, coordinate tools, previews, review queues, and audit history. An in-game command interface may be a small adapter-facing UI, not the only user interface.
@@ -119,7 +116,7 @@ At connection time, an adapter reports:
 - batch limits and rate limits;
 - context available (player state, camera direction, interior, virtual world, object inspection).
 
-The AI must degrade gracefully. If an exact raycast is unavailable, it should request a selected point or label its calculated point as an estimate.
+The AI must degrade gracefully. If an exact raycast is unavailable, it should request a selected point or label its calculated point as an estimate. The same principle applies to every domain: discover capabilities, explain unavailable operations, and never claim access the adapter does not provide.
 
 ## 7. Reliability
 
