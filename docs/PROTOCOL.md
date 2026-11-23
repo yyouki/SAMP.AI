@@ -13,6 +13,7 @@ The protocol separates the SAMP.AI Core from game-server runtimes. It is languag
 - Coordinates include provenance and context, not only x/y/z.
 - Drafts are immutable once submitted for approval. Any edit creates a new revision.
 - Server execution is represented as typed operations, never arbitrary source code.
+- Object source is explicit: native GTA world object, server-created object, player object, or temporary preview object.
 
 ## 2. Message envelope
 
@@ -104,7 +105,7 @@ For local coordinates, use `frame: "local"` and require an `anchor_id` or a comp
 
 ## 4. Capability handshake
 
-When an adapter connects, it sends a `adapter.hello` message with runtime metadata and capabilities.
+When an adapter connects, it sends an `adapter.hello` message with runtime metadata and capabilities.
 
 Example:
 
@@ -131,6 +132,8 @@ Example:
       "mapping.delete_object",
       "mapping.create_marker",
       "mapping.remove_marker",
+      "world.default_objects.remove_per_player",
+      "world.default_objects.removed_count",
       "textdraw.create",
       "textdraw.destroy",
       "project.batch_apply"
@@ -143,7 +146,7 @@ Example:
 }
 ```
 
-Capability names are examples. The final registry should be maintained centrally and versioned. An adapter may advertise optional capabilities such as `context.camera_ray`, `context.surface_hit`, `mapping.inspect_object`, or `preview.private_world`.
+Capability names are examples. The final registry should be maintained centrally and versioned. Optional native-world capabilities may include `world.default_objects.catalog_query`, `world.default_objects.private_markers`, and `world.default_objects.replacement_objects`. Do not advertise `world.default_objects.native_restore` unless the runtime has a tested genuine native inverse operation.
 
 ## 5. Core actions
 
@@ -155,9 +158,12 @@ Initial action groups:
 | Anchors | `anchor.create`, `anchor.list`, `anchor.update`, `anchor.delete` |
 | Markers | `marker.create`, `marker.update`, `marker.remove`, `marker.clear_session` |
 | Mapping | `mapping.create_object`, `mapping.update_object`, `mapping.delete_object`, `mapping.inspect` |
+| Native world | `world.default_object.query`, `world.default_object.mark`, `world.default_object.remove`, `world.default_object.restore_proxy` |
 | TextDraw | `textdraw.create`, `textdraw.update`, `textdraw.destroy`, `textdraw.preview` |
 | Projects | `project.create`, `project.get`, `project.save_revision`, `project.restore_revision` |
 | Execution | `plan.validate`, `plan.preview`, `plan.apply`, `plan.cancel` |
+
+A `restore_proxy` operation creates an explicitly labelled server-object substitute; it does not restore the original native GTA object. There is no generic `world.default_object.restore` action in the initial protocol because the documented open.mp / SA-MP removal API has no matching native restore operation. Native removal undo may require a fresh client session without replaying the directive, a proxy replacement, or may be unavailable. See [Native World Objects and Undo/Redo](NATIVE_WORLD_OBJECTS.md).
 
 An action name is only a protocol identifier. It must still pass authentication, authorization, schema validation, capability checks, resource limits, and approval policy.
 
@@ -176,6 +182,7 @@ A mapping draft contains operations with stable local IDs. It is not executable 
     {
       "operation_id": "op_wall_001",
       "type": "object.create",
+      "object_source": "server_object",
       "local_id": "wall_north_01",
       "model_id": 19377,
       "transform": {
@@ -196,6 +203,8 @@ A mapping draft contains operations with stable local IDs. It is not executable 
 }
 ```
 
+A native-world removal draft should use a separate operation type and explicit target scope. It must include model ID, center, radius, candidate provenance, affected player scope, and a declared undo strategy. It must never be represented as an ordinary `object.delete` operation because the native map object has no ordinary server object handle.
+
 The validator must check model availability, finite numeric values, coordinate bounds, transform completeness, duplicate IDs, operation count, and adapter capability support. The example model ID is illustrative and must be checked against a trusted catalog before use.
 
 ## 7. Events
@@ -208,6 +217,8 @@ Adapters can publish events such as:
 - `textdraw.changed`
 - `project.revision_applied`
 - `project.execution_failed`
+- `world.default_object.removal_applied`
+- `world.default_object.removal_failed`
 
 Events should be scoped to the minimum necessary project/server context. Avoid streaming general player chat or unrelated player activity by default.
 
@@ -222,6 +233,8 @@ A plan approval must reference:
 - scope of approval (server instance / project).
 
 If the draft changes, the content hash changes and the previous approval is invalid. Applying a plan should return per-operation results and a final status such as `succeeded`, `partially_succeeded`, or `failed`.
+
+For native-world removal, results must be reported per player session because the operation is player-scoped. The adapter must deduplicate approved removal directives for each client session; it must not blindly replay a removal that has already been applied.
 
 ## 9. Compatibility
 
