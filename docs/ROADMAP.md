@@ -79,11 +79,18 @@ The protocol and conformance tests should lead; additional adapters should not i
 
 ## Phase 8 — Dashboard and ecosystem
 - [ ] Web dashboard for projects, conversation, previews, approvals, and audit.
-- [ ] Extension / skill registry.
+- [ ] Dynamic skill and typed-tool registry that is not limited to mapping/TextDraw.
+- [ ] Extension manager and manifest format for community skills, tools, adapters, providers, catalogs, and UI components.
+- [ ] Per-extension permission, dependency, compatibility, and data-access review.
 - [ ] Provider configuration UI.
 - [ ] Template library for mapping and TextDraw.
 - [ ] Import/export tools for supported mapping formats.
+- [ ] Additional domain skills such as diagnostics, project/code assistance, database planning, gameplay design, testing, and documentation.
 - [ ] Public documentation and examples.
+
+## Long-term scope
+
+Mapping and TextDraw are the first end-to-end use cases, not permanent limits on the assistant. The extension system should make it possible to add new domains without rewriting the AI core. See [Extensibility and AI Autonomy](EXTENSIBILITY_AND_AUTONOMY.md).
 
 ## Non-goals for the first MVP
 
