@@ -120,6 +120,6 @@ The included in-memory conversation store is for tests and local development onl
 - Tool handlers must honor their `AbortSignal`. A timeout stops awaiting the result but cannot forcibly stop JavaScript code that ignores cancellation.
 - A non-read tool (draft, mutate, delete, publish, execute) is blocked unless an audit sink is configured. Production deployments need a durable append-only audit implementation. If the final success event cannot be persisted after a tool ran, the executor returns `AUDIT_PERSISTENCE_FAILED`; callers must check the operation state before retrying.
 - The OpenAI provider uses the Responses API. Configure it with a server-side API key and model name; do not expose credentials to game clients.
-- Durable conversation storage, HTTP/WebSocket protocol server, real Pawn adapter, and dashboard are not implemented in this phase.
+- Durable conversation storage, generic adapter action/task dispatch, real Pawn adapter, and dashboard are not implemented in this phase. The HTTP gateway currently handles adapter registration, heartbeat, inspection, and disconnect only.
 
 This is an implementation scaffold, not a production-ready server integration.
