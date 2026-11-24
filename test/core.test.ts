@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import { resolve } from "node:path";
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { test } from "node:test";
 import {
   AuthorizationError,
@@ -295,6 +297,7 @@ test("extension loader returns a disabled candidate using registered tool bindin
   assert.equal(candidate.manifest.id, "community.scene-auditor");
   assert.equal(candidate.skills.length, 1);
   assert.equal(candidate.skills[0]?.allowedTools[0], "community.scene-auditor.inspect");
+  assert.deepEqual(candidate.toolBindings, [{ id: "community.scene-auditor.inspect", implementationId: "mapping.inspect" }]);
   assert.match(candidate.skills[0]?.instruction ?? "", /Do not modify/);
 });
 
@@ -306,9 +309,24 @@ test("extension loader rejects unknown tool implementations", async () => {
     createDefaultSchemaValidator(),
     registry
   );
+  const temporaryDirectory = await mkdtemp(join(tmpdir(), "samp-ai-extension-"));
 
-  // The shipped example uses a known implementation; unknown bindings are covered by
-  // the loader's explicit lookup guard and can be exercised with a modified fixture.
-  assert.equal(registry.hasImplementation("mapping.inspect"), true);
-  assert.equal(registry.hasImplementation("database.drop_all"), false);
+  try {
+    const sourceDirectory = resolve(process.cwd(), "examples/extensions/scene-auditor");
+    await cp(sourceDirectory, temporaryDirectory, { recursive: true });
+
+    const manifestPath = join(temporaryDirectory, "extension.json");
+    const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
+      tools: Array<{ implementation: string }>;
+    };
+    manifest.tools[0]!.implementation = "database.drop_all";
+    await writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
+
+    await assert.rejects(
+      loader.loadCandidate(temporaryDirectory),
+      /Tool implementation is not registered/
+    );
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
 });
