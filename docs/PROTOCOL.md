@@ -236,7 +236,18 @@ If the draft changes, the content hash changes and the previous approval is inva
 
 For native-world removal, results must be reported per player session because the operation is player-scoped. The adapter must deduplicate approved removal directives for each client session; it must not blindly replay a removal that has already been applied.
 
-## 9. Compatibility
+## 9. Machine-readable schemas and validation
+
+The initial protocol schemas are stored in:
+- `schemas/protocol/message.schema.json` — request, response, and event envelopes.
+- `schemas/protocol/adapter-hello.schema.json` — adapter capability handshake.
+- `schemas/protocol/coordinate.schema.json` — world/local positions with provenance.
+
+The TypeScript `ProtocolValidator` exposes validation methods for message envelopes, adapter hello events, and coordinates. Adapter implementations should validate inbound and outbound messages at their trust boundary.
+
+The schemas are versioned with the protocol. A schema update must include compatibility notes and tests with valid and invalid fixtures.
+
+## 10. Compatibility
 
 - Protocol versions use `major.minor` semantics.
 - A major version may introduce breaking changes.
