@@ -1365,7 +1365,7 @@ test("OpenAI Responses provider validates configuration", () => {
       model: "test-model",
       baseUrl: "file:///etc/passwd"
     }),
-    /HTTP or HTTPS/
+    /HTTPS/
   );
 });
 
@@ -1607,4 +1607,141 @@ test("HTTP adapter gateway supports an authenticated disconnect endpoint", async
   } finally {
     await gateway.close();
   }
+});
+
+
+test("restricted automation blocks draft tools that are not explicitly allowlisted", async () => {
+  const registry = new ToolRegistry();
+  registry.register({
+    ...createReadTool(),
+    id: "project.create-draft",
+    implementationId: "project.create-draft",
+    effect: "draft",
+    risk: "low",
+    handler: async () => ({ projectId: "hospital", count: 0 })
+  });
+
+  const executor = new ToolExecutor(
+    registry,
+    new PermissionEngine({ verify: async () => true }),
+    new JsonSchemaValidator(),
+    { write: async () => undefined }
+  );
+
+  await assert.rejects(
+    executor.execute(
+      "project.create-draft",
+      { projectId: "hospital" },
+      {
+        actor: { id: "mapper-01", permissions: ["project.view"] },
+        serverInstanceId: "server-test",
+        projectId: "hospital",
+        adapterCapabilities: ["project.inspect"],
+        autonomy: "restricted_automation",
+        autoAllowedToolIds: []
+      }
+    ),
+    (error: unknown) =>
+      error instanceof AuthorizationError &&
+      error.code === "AUTONOMY_RESTRICTED"
+  );
+});
+
+test("OpenAI provider rejects insecure non-loopback HTTP endpoints", () => {
+  assert.throws(
+    () => new OpenAIResponsesProvider({
+      apiKey: "test-key",
+      model: "test-model",
+      baseUrl: "http://api.example.com/v1"
+    }),
+    /HTTPS/
+  );
+
+  assert.doesNotThrow(() => new OpenAIResponsesProvider({
+    apiKey: "test-key",
+    model: "test-model",
+    baseUrl: "http://127.0.0.1:8787/v1",
+    fetcher: async () => new Response(JSON.stringify({ output: [] }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    })
+  }));
+});
+
+test("agent runner forwards backend-provided approval receipt and draft hash to the context factory", async () => {
+  const registry = new ToolRegistry();
+  registerMockAdapterTools(registry);
+
+  const skills = new SkillRegistry(
+    { verify: async () => true },
+    { verify: async () => true }
+  );
+  const adapterRegistry = new AdapterRegistry(
+    new ProtocolValidator(createDefaultSchemaValidator())
+  );
+  adapterRegistry.registerHello({
+    protocol: "sampai/0.1",
+    message_id: "hello_approval_forward",
+    type: "event",
+    server_instance_id: "server-approval-forward",
+    timestamp: "2026-11-24T15:00:00Z",
+    event: "adapter.hello",
+    payload: {
+      adapter: { name: "sampai-pawn", version: "0.1.0", runtime: "open.mp" },
+      capabilities: ["mapping.inspect"],
+      limits: { max_operations_per_batch: 20, max_objects_per_project: 1000 }
+    }
+  }, {
+    adapterId: "sampai-pawn",
+    serverInstanceId: "server-approval-forward"
+  });
+
+  let capturedOptions: { draftHash?: string; approval?: ApprovalReceipt } | undefined;
+  const realFactory = new ExecutionContextFactory(
+    adapterRegistry,
+    { resolve: async (actorId) => ({ id: actorId, permissions: ["ai.use"] }) },
+    { resolve: async () => ({ mode: "observe", autoAllowedToolIds: [] }) }
+  );
+
+  const contextFactory = {
+    create: async (
+      principal: { subject: string },
+      serverInstanceId: string,
+      projectId?: string,
+      options?: { draftHash?: string; approval?: ApprovalReceipt; signal?: AbortSignal }
+    ) => {
+      capturedOptions = options;
+      return realFactory.create(principal, serverInstanceId, projectId, options);
+    }
+  } as ExecutionContextFactory;
+
+  const runner = new AgentRunner(
+    {
+      complete: async () => ({ content: "Approval metadata was passed to the trusted context factory." })
+    },
+    new InMemoryAgentConversationStore(),
+    skills,
+    new SkillToolDispatcher(
+      skills,
+      new ToolExecutor(
+        registry,
+        new PermissionEngine({ verify: async () => true }),
+        new JsonSchemaValidator()
+      )
+    ),
+    contextFactory
+  );
+
+  const result = await runner.run({
+    principal: { subject: "admin-approval" },
+    serverInstanceId: "server-approval-forward",
+    sessionId: "approval-forward",
+    userMessage: "Continue the approved plan.",
+    draftHash: approval.draftHash,
+    approval
+  });
+
+  assert.equal(result.stoppedBecause, "completed");
+  assert.equal(capturedOptions?.draftHash, approval.draftHash);
+  assert.equal(capturedOptions?.approval?.approvalId, approval.approvalId);
 });
