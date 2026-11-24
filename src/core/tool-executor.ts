@@ -16,13 +16,32 @@ export class ToolExecutor {
     private readonly audit?: AuditSink
   ) {}
 
-  async execute<TOutput = unknown>(
+  execute<TOutput = unknown>(
     toolId: string,
     input: unknown,
     context: ExecutionContext
   ): Promise<TOutput> {
-    const tool = this.registry.get(toolId);
+    return this.executeDefinition(this.registry.get(toolId), input, context);
+  }
 
+  /** Resolve an extension binding to its already-registered implementation. */
+  executeImplementation<TOutput = unknown>(
+    implementationId: string,
+    input: unknown,
+    context: ExecutionContext
+  ): Promise<TOutput> {
+    return this.executeDefinition(
+      this.registry.getImplementation(implementationId),
+      input,
+      context
+    );
+  }
+
+  private async executeDefinition<TOutput>(
+    tool: ToolDefinition,
+    input: unknown,
+    context: ExecutionContext
+  ): Promise<TOutput> {
     // Authorization is checked before revealing schema details or invoking code.
     try {
       await this.permissions.assertAuthorized(tool, context);
@@ -79,7 +98,7 @@ export class ToolExecutor {
       clearTimeout(timeout);
     }
 
-    // Keep success-audit failures separate: the tool may already have completed.
+    // The operation may already have completed if persisting this final event fails.
     await this.writeAudit({
       event: "tool.succeeded",
       toolId: tool.id,
