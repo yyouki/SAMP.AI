@@ -330,3 +330,104 @@ test("extension loader rejects unknown tool implementations", async () => {
     await rm(temporaryDirectory, { recursive: true, force: true });
   }
 });
+
+
+test("protocol validator accepts a well-formed adapter handshake", () => {
+  const validator = new ProtocolValidator(createDefaultSchemaValidator());
+  const hello = {
+  "protocol": "sampai/0.1",
+  "message_id": "hello_pawn_001",
+  "type": "event",
+  "server_instance_id": "server_ls_01",
+  "timestamp": "2026-11-24T15:00:00Z",
+  "event": "adapter.hello",
+  "payload": {
+    "adapter": {
+      "name": "sampai-pawn",
+      "version": "0.1.0",
+      "runtime": "open.mp",
+      "runtime_version": "reported-by-adapter"
+    },
+    "capabilities": [
+      "context.player_position",
+      "context.player_facing",
+      "mapping.create_object",
+      "mapping.inspect",
+      "mapping.create_marker",
+      "mapping.remove_marker"
+    ],
+    "limits": {
+      "max_operations_per_batch": 20,
+      "max_objects_per_project": 1000
+    }
+  }
+};
+
+  const result = validator.validateAdapterHello(hello);
+
+  assert.equal(result.event, "adapter.hello");
+  assert.equal(result.payload.adapter.runtime, "open.mp");
+  assert.ok(result.payload.capabilities.includes("mapping.inspect"));
+});
+
+test("protocol validator rejects a request without request_id", () => {
+  const validator = new ProtocolValidator(createDefaultSchemaValidator());
+
+  assert.throws(
+    () => validator.validateMessage({
+      protocol: "sampai/0.1",
+      message_id: "request_001",
+      type: "request",
+      server_instance_id: "server_ls_01",
+      timestamp: "2026-11-24T15:00:00Z",
+      actor: { id: "admin_01", kind: "admin" },
+      action: "mapping.inspect",
+      payload: {}
+    }),
+    /request_id/
+  );
+});
+
+test("protocol validator accepts world coordinates with provenance", () => {
+  const validator = new ProtocolValidator(createDefaultSchemaValidator());
+  const coordinate = {
+  "frame": "world",
+  "position": {
+    "x": 1481.2,
+    "y": -1724.6,
+    "z": 13.5
+  },
+  "rotation": {
+    "x": 0,
+    "y": 0,
+    "z": 90
+  },
+  "context": {
+    "interior_id": 0,
+    "virtual_world_id": 0
+  },
+  "provenance": {
+    "source": "user_selected_point",
+    "adapter_method": "editor.select_point",
+    "captured_at": "2026-11-24T15:00:00Z",
+    "confidence": "high"
+  }
+};
+
+  const result = validator.validateCoordinate<typeof coordinateSample>(coordinate);
+  assert.equal(result.frame, "world");
+  assert.equal(result.provenance.source, "user_selected_point");
+});
+
+test("protocol validator requires an anchor for local coordinates", () => {
+  const validator = new ProtocolValidator(createDefaultSchemaValidator());
+
+  assert.throws(
+    () => validator.validateCoordinate({
+      frame: "local",
+      position: { x: 0, y: 0, z: 0 },
+      provenance: { source: "derived_from_anchor", confidence: "high" }
+    }),
+    /anchor_id/
+  );
+});
