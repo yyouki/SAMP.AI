@@ -86,7 +86,7 @@ The mock tool is for tests and development. It does not connect to an open.mp se
 - The permission engine requires a trusted `ApprovalVerifier`; this repository does not yet contain a production signature/identity service.
 - The `ExecutionContext` must be created by trusted backend authentication and policy code. Never construct it from model output or an untrusted game-client request.
 - Tool handlers must honor their `AbortSignal`. A timeout stops awaiting the result but cannot forcibly stop JavaScript code that ignores cancellation.
-- The audit interface is injectable. Production deployments need a durable append-only audit implementation.
+- The audit interface is injectable. Production deployments need a durable append-only audit implementation. If the final success event cannot be persisted after a tool ran, the executor returns `AUDIT_PERSISTENCE_FAILED`; callers must check the operation state before retrying.
 - The model provider, conversation manager, HTTP/WebSocket protocol server, real Pawn adapter, and dashboard are not implemented in this phase.
 
 This is an implementation scaffold, not a production-ready server integration.
