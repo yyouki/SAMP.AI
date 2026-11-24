@@ -40,6 +40,7 @@ npm run build
 | `src/agent/contracts.ts` | Provider-neutral model and conversation contracts |
 | `src/agent/in-memory-conversation-store.ts` | Development conversation history store |
 | `src/agent/agent-runner.ts` | Bounded model/tool orchestration loop |
+| `src/providers/openai-responses-provider.ts` | Optional OpenAI Responses API provider adapter |
 | `src/adapters/mock/register-mock-tools.ts` | Deterministic mock mapping inspection tool |
 | `test/core.test.ts` | Initial core unit tests |
 
@@ -100,7 +101,7 @@ The mock tool is for tests and development. It does not connect to an open.mp se
 
 The provider-neutral agent runner exposes only tools attached to skills enabled for the current server and visible to the authenticated actor. Every tool call is routed through the skill dispatcher and the permission-aware executor. The loop has capped steps, capped tool calls, a time budget, and cancellation support.
 
-The included in-memory conversation store is for tests and local development only. The agent loop exposes only tools from enabled skills, caps history/steps/tool calls/time/output, uses provider-compatible tool names, and propagates cancellation to tool handlers. No commercial or local model provider is included yet.
+The included in-memory conversation store is for tests and local development only. The agent loop exposes only tools from enabled skills, caps history/steps/tool calls/time/output, uses provider-compatible tool names, and propagates cancellation to tool handlers. An optional OpenAI Responses API provider is included; other providers remain independent adapters.
 
 ## Important boundaries
 
@@ -110,7 +111,7 @@ The included in-memory conversation store is for tests and local development onl
 - The `ExecutionContext` must be created by trusted backend authentication and policy code. Never construct it from model output or an untrusted game-client request.
 - Tool handlers must honor their `AbortSignal`. A timeout stops awaiting the result but cannot forcibly stop JavaScript code that ignores cancellation.
 - A non-read tool (draft, mutate, delete, publish, execute) is blocked unless an audit sink is configured. Production deployments need a durable append-only audit implementation. If the final success event cannot be persisted after a tool ran, the executor returns `AUDIT_PERSISTENCE_FAILED`; callers must check the operation state before retrying.
-- No cloud or local model provider is implemented in this phase; the provider-neutral interface and agent loop are ready for one.
+- The OpenAI provider uses the Responses API. Configure it with a server-side API key and model name; do not expose credentials to game clients.
 - Durable conversation storage, HTTP/WebSocket protocol server, real Pawn adapter, and dashboard are not implemented in this phase.
 
 This is an implementation scaffold, not a production-ready server integration.
