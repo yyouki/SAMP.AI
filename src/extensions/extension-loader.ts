@@ -88,12 +88,10 @@ export interface ExtensionCandidate {
   readonly toolBindings: readonly LoadedToolBinding[];
 }
 
-const RISK_SCORE: Record<RiskLevel, number> = {
-  low: 0,
-  medium: 1,
-  high: 2,
-  critical: 3
-};
+function sameStringSet(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length &&
+    left.every((value) => right.includes(value));
+}
 
 export class ExtensionLoader {
   constructor(
@@ -280,53 +278,17 @@ export class ExtensionLoader {
         );
       }
 
-      if (binding.timeout_ms > implementation.timeoutMs) {
+      if (
+        binding.timeout_ms !== implementation.timeoutMs ||
+        binding.idempotent !== implementation.idempotent ||
+        binding.compensation !== implementation.compensation ||
+        binding.effect !== implementation.effect ||
+        binding.risk !== implementation.risk ||
+        !sameStringSet(binding.required_permissions, implementation.requiredPermissions) ||
+        !sameStringSet(binding.required_capabilities, implementation.requiredCapabilities)
+      ) {
         throw new ExtensionLoadError(
-          `Tool binding ${binding.id} cannot increase the implementation timeout.`
-        );
-      }
-
-      if (binding.idempotent && !implementation.idempotent) {
-        throw new ExtensionLoadError(
-          `Tool binding ${binding.id} cannot claim idempotency not provided by its implementation.`
-        );
-      }
-
-      if (binding.compensation !== implementation.compensation) {
-        throw new ExtensionLoadError(
-          `Tool binding ${binding.id} must declare the implementation compensation strategy.`
-        );
-      }
-
-      if (implementation.effect !== binding.effect) {
-        throw new ExtensionLoadError(
-          `Tool binding ${binding.id} understates or changes the implementation effect.`
-        );
-      }
-
-      if (RISK_SCORE[binding.risk] < RISK_SCORE[implementation.risk]) {
-        throw new ExtensionLoadError(
-          `Tool binding ${binding.id} understates implementation risk.`
-        );
-      }
-
-      const missingPermissions = implementation.requiredPermissions.filter(
-        (permission) => !binding.required_permissions.includes(permission)
-      );
-
-      if (missingPermissions.length > 0) {
-        throw new ExtensionLoadError(
-          `Tool binding ${binding.id} omits implementation permission(s): ${missingPermissions.join(", ")}`
-        );
-      }
-
-      const missingCapabilities = implementation.requiredCapabilities.filter(
-        (capability) => !binding.required_capabilities.includes(capability)
-      );
-
-      if (missingCapabilities.length > 0) {
-        throw new ExtensionLoadError(
-          `Tool binding ${binding.id} omits implementation capability/capabilities: ${missingCapabilities.join(", ")}`
+          `Tool binding ${binding.id} metadata must exactly match its registered implementation.`
         );
       }
     }
