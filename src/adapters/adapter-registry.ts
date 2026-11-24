@@ -1,5 +1,5 @@
 import { SampAiError } from "../core/errors.js";
-import { ProtocolValidator, type AdapterHelloMessage } from "../protocol/protocol-validator.js";
+import { ProtocolValidator } from "../protocol/protocol-validator.js";
 
 export interface AuthenticatedAdapterIdentity {
   /** Stable adapter identity supplied by trusted transport authentication. */
@@ -37,6 +37,13 @@ export class AdapterRegistry {
     input: unknown,
     authenticatedIdentity: AuthenticatedAdapterIdentity
   ): RegisteredAdapter {
+    if (!authenticatedIdentity.adapterId.trim() || !authenticatedIdentity.serverInstanceId.trim()) {
+      throw new SampAiError(
+        "Authenticated adapter and server identifiers must be non-empty.",
+        "ADAPTER_IDENTITY_INVALID"
+      );
+    }
+
     const hello = this.protocol.validateAdapterHello(input);
 
     // Bind protocol claims to identity established by the trusted transport layer.
@@ -140,6 +147,19 @@ export class AdapterRegistry {
         "CAPABILITY_UNAVAILABLE"
       );
     }
+  }
+
+  touch(
+    serverInstanceId: string,
+    adapterId: string
+  ): RegisteredAdapter {
+    const current = this.getAdapter(serverInstanceId, adapterId);
+    const updated = Object.freeze({
+      ...current,
+      lastSeenAt: new Date().toISOString()
+    });
+    this.adapters.set(this.getKey(serverInstanceId, adapterId), updated);
+    return updated;
   }
 
   unregister(serverInstanceId: string, adapterId: string): boolean {
