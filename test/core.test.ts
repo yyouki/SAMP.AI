@@ -459,3 +459,52 @@ test("executor can resolve an implementation ID for extension tool bindings", as
 
   assert.deepEqual(result, { projectId: "hospital", count: 2 });
 });
+
+
+test("executor identifies when a tool may have completed but final audit persistence failed", async () => {
+  const registry = new ToolRegistry();
+  let handlerCalled = false;
+  registry.register({
+    ...createReadTool(),
+    handler: async (input) => {
+      handlerCalled = true;
+      return {
+        projectId: (input as { projectId: string }).projectId,
+        count: 1
+      };
+    }
+  });
+
+  const executor = new ToolExecutor(
+    registry,
+    new PermissionEngine({ verify: async () => true }),
+    new JsonSchemaValidator(),
+    {
+      write: async (event) => {
+        if (event.event === "tool.succeeded") {
+          throw new Error("audit database unavailable");
+        }
+      }
+    }
+  );
+
+  await assert.rejects(
+    executor.execute(
+      "project.inspect",
+      { projectId: "hospital" },
+      {
+        actor: { id: "mapper-01", permissions: ["project.view"] },
+        serverInstanceId: "server-test",
+        projectId: "hospital",
+        adapterCapabilities: ["project.inspect"],
+        autonomy: "observe"
+      }
+    ),
+    (error: unknown) =>
+      error instanceof Error &&
+      "code" in error &&
+      error.code === "AUDIT_PERSISTENCE_FAILED"
+  );
+
+  assert.equal(handlerCalled, true);
+});
