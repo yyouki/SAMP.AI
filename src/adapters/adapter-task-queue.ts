@@ -269,7 +269,14 @@ export class AdapterTaskQueue {
     task.state = "leased";
     task.attempts += 1;
     task.leaseToken = randomBytes(32).toString("base64url");
-    task.leaseExpiresAt = new Date(Date.now() + this.leaseMs).toISOString();
+    const leaseUntil = Math.min(
+      Date.now() + this.leaseMs,
+      Date.parse(task.expiresAt)
+    );
+    if (leaseUntil <= Date.now()) {
+      throw new SampAiError("Task has expired.", "TASK_EXPIRED");
+    }
+    task.leaseExpiresAt = new Date(leaseUntil).toISOString();
 
     return Object.freeze({
       ...this.snapshot(task),
@@ -288,7 +295,14 @@ export class AdapterTaskQueue {
     const task = this.getOwnedTask(serverInstanceId, adapterId, taskId);
     this.assertValidLease(task, leaseToken);
 
-    task.leaseExpiresAt = new Date(Date.now() + this.leaseMs).toISOString();
+    const leaseUntil = Math.min(
+      Date.now() + this.leaseMs,
+      Date.parse(task.expiresAt)
+    );
+    if (leaseUntil <= Date.now()) {
+      throw new SampAiError("Task has expired.", "TASK_EXPIRED");
+    }
+    task.leaseExpiresAt = new Date(leaseUntil).toISOString();
 
     return Object.freeze({
       ...this.snapshot(task),
@@ -388,6 +402,7 @@ export class AdapterTaskQueue {
 
   private assertValidLease(task: TaskRecord, leaseToken: string): void {
     if (
+      Date.parse(task.expiresAt) <= Date.now() ||
       task.state !== "leased" ||
       !task.leaseToken ||
       !task.leaseExpiresAt ||
@@ -405,11 +420,19 @@ export class AdapterTaskQueue {
     const now = Date.now();
 
     for (const task of this.tasks.values()) {
-      if (
-        task.state === "queued" &&
-        Date.parse(task.expiresAt) <= now
-      ) {
+      const terminal =
+        task.state === "succeeded" ||
+        task.state === "partially_succeeded" ||
+        task.state === "failed" ||
+        task.state === "expired";
+
+      if (terminal) continue;
+
+      // Absolute task TTL applies even while an adapter holds a lease.
+      if (Date.parse(task.expiresAt) <= now) {
         task.state = "expired";
+        delete task.leaseToken;
+        delete task.leaseExpiresAt;
         continue;
       }
 
@@ -421,9 +444,7 @@ export class AdapterTaskQueue {
         delete task.leaseToken;
         delete task.leaseExpiresAt;
 
-        if (Date.parse(task.expiresAt) <= now) {
-          task.state = "expired";
-        } else if (task.attempts >= task.maxAttempts) {
+        if (task.attempts >= task.maxAttempts) {
           task.state = "failed";
           task.result = {
             status: "failed",
