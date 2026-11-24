@@ -43,7 +43,7 @@ npm run build
 
 The adapter registry accepts a validated hello only when the server instance and adapter name match identity supplied by trusted transport authentication. It replaces stale capabilities on reconnect and exposes the union of capabilities for a server instance.
 
-The registry does not implement credential authentication itself. A future HTTP/WebSocket gateway must authenticate the adapter first and pass the resulting trusted identity into `registerHello`.
+The registry does not implement credential authentication itself. A future HTTP/WebSocket gateway must authenticate the adapter first and pass the resulting trusted identity into `registerHello`. `ExecutionContextFactory` similarly resolves user permissions and autonomy from trusted backend services and can attach a server-verified approval receipt.
 
 ## Protocol validation
 
