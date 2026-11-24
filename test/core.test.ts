@@ -24,6 +24,7 @@ import {
   type ModelProvider,
   OpenAIResponsesProvider,
   HttpAdapterGateway,
+  type ApprovalReceipt,
   InMemoryBearerAdapterAuthenticator
 } from "../src/index.js";
 
@@ -1713,7 +1714,7 @@ test("agent runner forwards backend-provided approval receipt and draft hash to 
       capturedOptions = options;
       return realFactory.create(principal, serverInstanceId, projectId, options);
     }
-  } as ExecutionContextFactory;
+  } as unknown as ExecutionContextFactory;
 
   const runner = new AgentRunner(
     {
