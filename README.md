@@ -100,6 +100,7 @@ The AI may discuss, inspect, plan, and prepare drafts according to the user's pe
 - [Architecture](docs/ARCHITECTURE.md)
 - [Universal protocol](docs/PROTOCOL.md)
 - [Core implementation](docs/CORE_IMPLEMENTATION.md)
+- [HTTP adapter gateway](docs/ADAPTER_GATEWAY.md)
 - [AI behavior and permissions](docs/AI_BEHAVIOR.md)
 - [Coordinate and marker workflow](docs/COORDINATES_AND_MARKERS.md)
 - [Native GTA world objects and undo/redo](docs/NATIVE_WORLD_OBJECTS.md)
