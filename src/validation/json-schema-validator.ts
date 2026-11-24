@@ -1,14 +1,15 @@
-import Ajv, { type AnySchema, type ValidateFunction } from "ajv";
+import Ajv2020 from "ajv/dist/2020.js";
+import type { AnySchema, ValidateFunction } from "ajv";
 import addFormats from "ajv-formats";
 import { SchemaValidationError } from "../core/errors.js";
 import type { JsonSchema } from "../shared/contracts.js";
 
 export class JsonSchemaValidator {
-  private readonly ajv: Ajv;
+  private readonly ajv: Ajv2020;
   private readonly compiled = new WeakMap<object, ValidateFunction>();
 
   constructor(schemas: readonly AnySchema[] = []) {
-    this.ajv = new Ajv({
+    this.ajv = new Ajv2020({
       allErrors: true,
       strict: false,
       validateFormats: true
