@@ -130,7 +130,15 @@ A future extension system should include:
 
 A community extension should not gain access merely because it is installed. The server owner must enable it and grant its declared permissions.
 
-## 8. Design rule
+## 8. Self-expanding skills
+
+The first version should let the agent generate declarative skill candidates, not executable code. A candidate may include a manifest, instruction files, test fixtures, and bindings to tools that are already registered. Unknown tool implementations must be rejected.
+
+The lifecycle is: identify a workflow gap, draft a skill, validate its manifest and paths, test it with mocked tools and adversarial inputs, show the package diff and requested permissions, obtain maintainer review, and then require the server owner to enable it. Generated candidates start disabled.
+
+The machine-readable package contract is defined by the schemas under schemas/extensions/. The first example package is examples/extensions/scene-auditor/. See [Self-Expanding Skills](SELF_EXPANDING_SKILLS.md).
+
+## 9. Design rule
 
 When proposing a new AI capability, ask:
 
