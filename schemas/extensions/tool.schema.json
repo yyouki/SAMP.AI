@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/yyouki/SAMP.AI/main/schemas/extensions/tool.schema.json",
+  "title": "SAMP.AI Extension Tool Binding",
+  "description": "A declaration binding an extension tool name to an implementation already registered by SAMP.AI Core or an adapter. It does not implement or authorize the tool.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "description",
+    "implementation",
+    "effect",
+    "risk",
+    "required_permissions",
+    "required_capabilities",
+    "input_schema",
+    "output_schema",
+    "timeout_ms",
+    "idempotent",
+    "compensation"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,100}$"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 500
+    },
+    "implementation": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9_]*)+$"
+    },
+    "effect": {
+      "enum": [
+        "read",
+        "draft",
+        "mutate",
+        "delete",
+        "publish",
+        "execute"
+      ]
+    },
+    "risk": {
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "required_permissions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9_]*)+$"
+      }
+    },
+    "required_capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9_]*)+$"
+      }
+    },
+    "input_schema": {
+      "type": "object",
+      "description": "A JSON Schema object validated independently by the protocol gateway."
+    },
+    "output_schema": {
+      "type": "object",
+      "description": "A JSON Schema object validated independently by the protocol gateway."
+    },
+    "timeout_ms": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 30000
+    },
+    "idempotent": {
+      "type": "boolean"
+    },
+    "compensation": {
+      "enum": [
+        "none",
+        "undo",
+        "compensation",
+        "manual",
+        "reconnect_required"
+      ]
+    }
+  }
+}
