@@ -1,4 +1,5 @@
 import { readFile, realpath, stat } from "node:fs/promises";
+import { isDeepStrictEqual } from "node:util";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { ExtensionLoadError } from "../core/errors.js";
 import { ToolRegistry } from "../core/tool-registry.js";
@@ -194,6 +195,29 @@ export class ExtensionLoader {
         }
       }
 
+      const allowedBindings = manifest.tools.filter((binding) =>
+        skill.allowed_tools.includes(binding.id)
+      );
+      const allowedPermissions = new Set(
+        allowedBindings.flatMap((binding) => binding.required_permissions)
+      );
+      const allowedCapabilities = new Set(
+        allowedBindings.flatMap((binding) => binding.required_capabilities)
+      );
+
+      const unusedSkillPermissions = skill.required_permissions.filter(
+        (permission) => !allowedPermissions.has(permission)
+      );
+      const unusedSkillCapabilities = skill.required_capabilities.filter(
+        (capability) => !allowedCapabilities.has(capability)
+      );
+
+      if (unusedSkillPermissions.length > 0 || unusedSkillCapabilities.length > 0) {
+        throw new ExtensionLoadError(
+          `Skill ${skill.id} declares permissions or capabilities not used by its allowed tools.`
+        );
+      }
+
       const missingBindings = skill.allowed_tools.filter(
         (toolId) => !manifest.tools.some((binding) => binding.id === toolId)
       );
@@ -231,6 +255,36 @@ export class ExtensionLoader {
       }
 
       const implementation = this.tools.getImplementation(binding.implementation);
+
+      if (!isDeepStrictEqual(implementation.inputSchema, binding.input_schema)) {
+        throw new ExtensionLoadError(
+          `Tool binding ${binding.id} must use the registered implementation input schema.`
+        );
+      }
+
+      if (!isDeepStrictEqual(implementation.outputSchema, binding.output_schema)) {
+        throw new ExtensionLoadError(
+          `Tool binding ${binding.id} must use the registered implementation output schema.`
+        );
+      }
+
+      if (binding.timeout_ms > implementation.timeoutMs) {
+        throw new ExtensionLoadError(
+          `Tool binding ${binding.id} cannot increase the implementation timeout.`
+        );
+      }
+
+      if (binding.idempotent && !implementation.idempotent) {
+        throw new ExtensionLoadError(
+          `Tool binding ${binding.id} cannot claim idempotency not provided by its implementation.`
+        );
+      }
+
+      if (binding.compensation !== implementation.compensation) {
+        throw new ExtensionLoadError(
+          `Tool binding ${binding.id} must declare the implementation compensation strategy.`
+        );
+      }
 
       if (implementation.effect !== binding.effect) {
         throw new ExtensionLoadError(
