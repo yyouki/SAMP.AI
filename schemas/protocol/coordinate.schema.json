@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/yyouki/SAMP.AI/main/schemas/protocol/coordinate.schema.json",
+  "title": "SAMP.AI Coordinate",
+  "description": "World or anchor-local position with rotation, world context, and provenance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "frame",
+    "position",
+    "provenance"
+  ],
+  "properties": {
+    "frame": {
+      "enum": [
+        "world",
+        "local"
+      ]
+    },
+    "anchor_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y",
+        "z"
+      ],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "z": {
+          "type": "number"
+        }
+      }
+    },
+    "rotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y",
+        "z"
+      ],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "z": {
+          "type": "number"
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "interior_id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "virtual_world_id": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "confidence"
+      ],
+      "properties": {
+        "source": {
+          "enum": [
+            "user_supplied",
+            "user_selected_point",
+            "editor_surface_hit",
+            "player_position",
+            "camera_projection_estimate",
+            "derived_from_anchor",
+            "catalog_or_map_reference"
+          ]
+        },
+        "adapter_method": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "captured_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "confidence": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "frame": {
+            "const": "local"
+          }
+        },
+        "required": [
+          "frame"
+        ]
+      },
+      "then": {
+        "required": [
+          "anchor_id"
+        ]
+      }
+    }
+  ]
+}
