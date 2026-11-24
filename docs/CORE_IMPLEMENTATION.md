@@ -37,6 +37,9 @@ npm run build
 | `src/extensions/extension-loader.ts` | Validates and loads declarative extension candidates |
 | `src/extensions/skill-registry.ts` | Tracks candidates, maintainer review, and per-server activation |
 | `src/extensions/skill-tool-dispatcher.ts` | Enforces skill tool allowlists before dispatch |
+| `src/agent/contracts.ts` | Provider-neutral model and conversation contracts |
+| `src/agent/in-memory-conversation-store.ts` | Development conversation history store |
+| `src/agent/agent-runner.ts` | Bounded model/tool orchestration loop |
 | `src/adapters/mock/register-mock-tools.ts` | Deterministic mock mapping inspection tool |
 | `test/core.test.ts` | Initial core unit tests |
 
@@ -92,6 +95,12 @@ console.log(candidate.manifest.name);
 ```
 
 The mock tool is for tests and development. It does not connect to an open.mp server.
+
+## Agent loop
+
+The provider-neutral agent runner exposes only tools attached to skills enabled for the current server and visible to the authenticated actor. Every tool call is routed through the skill dispatcher and the permission-aware executor. The loop has capped steps, capped tool calls, a time budget, and cancellation support.
+
+The included in-memory conversation store is for tests and local development only. No commercial or local model provider is included yet.
 
 ## Important boundaries
 
