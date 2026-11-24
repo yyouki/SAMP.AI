@@ -14,7 +14,8 @@ import {
   ExtensionLoader,
   createDefaultSchemaValidator,
   registerMockAdapterTools,
-  ProtocolValidator
+  ProtocolValidator,
+  AdapterRegistry
 } from "../src/index.js";
 
 const inputSchema = {
@@ -507,4 +508,107 @@ test("executor identifies when a tool may have completed but final audit persist
   );
 
   assert.equal(handlerCalled, true);
+});
+
+
+test("adapter registry binds advertised capabilities to authenticated identity", () => {
+  const protocol = new ProtocolValidator(createDefaultSchemaValidator());
+  const registry = new AdapterRegistry(protocol);
+  const hello = {
+    protocol: "sampai/0.1",
+    message_id: "hello_pawn_001",
+    type: "event",
+    server_instance_id: "server_ls_01",
+    timestamp: "2026-11-24T15:00:00Z",
+    event: "adapter.hello",
+    payload: {
+      adapter: {
+        name: "sampai-pawn",
+        version: "0.1.0",
+        runtime: "open.mp",
+        runtime_version: "1.3.1"
+      },
+      capabilities: ["mapping.inspect", "mapping.create_marker"],
+      limits: {
+        max_operations_per_batch: 20,
+        max_objects_per_project: 1000
+      }
+    }
+  };
+
+  const adapter = registry.registerHello(hello, {
+    adapterId: "sampai-pawn",
+    serverInstanceId: "server_ls_01"
+  });
+
+  assert.equal(adapter.runtime, "open.mp");
+  assert.ok(registry.getServerCapabilities("server_ls_01").includes("mapping.inspect"));
+  assert.doesNotThrow(() =>
+    registry.assertCapabilities("server_ls_01", ["mapping.inspect"])
+  );
+});
+
+test("adapter registry rejects a server identity mismatch", () => {
+  const registry = new AdapterRegistry(
+    new ProtocolValidator(createDefaultSchemaValidator())
+  );
+  const hello = {
+    protocol: "sampai/0.1",
+    message_id: "hello_pawn_002",
+    type: "event",
+    server_instance_id: "server_other",
+    timestamp: "2026-11-24T15:00:00Z",
+    event: "adapter.hello",
+    payload: {
+      adapter: {
+        name: "sampai-pawn",
+        version: "0.1.0",
+        runtime: "open.mp"
+      },
+      capabilities: ["mapping.inspect"],
+      limits: {
+        max_operations_per_batch: 20,
+        max_objects_per_project: 1000
+      }
+    }
+  };
+
+  assert.throws(
+    () => registry.registerHello(hello, {
+      adapterId: "sampai-pawn",
+      serverInstanceId: "server_ls_01"
+    }),
+    /does not match its authenticated credential/
+  );
+});
+
+test("adapter registry replaces stale capabilities on reconnect", () => {
+  const registry = new AdapterRegistry(
+    new ProtocolValidator(createDefaultSchemaValidator())
+  );
+  const identity = {
+    adapterId: "sampai-pawn",
+    serverInstanceId: "server_ls_01"
+  };
+  const hello = (capabilities: string[]) => ({
+    protocol: "sampai/0.1",
+    message_id: "hello_reconnect_001",
+    type: "event",
+    server_instance_id: "server_ls_01",
+    timestamp: "2026-11-24T15:00:00Z",
+    event: "adapter.hello",
+    payload: {
+      adapter: { name: "sampai-pawn", version: "0.1.0", runtime: "open.mp" },
+      capabilities,
+      limits: { max_operations_per_batch: 20, max_objects_per_project: 1000 }
+    }
+  });
+
+  registry.registerHello(hello(["mapping.inspect", "textdraw.create"]), identity);
+  registry.registerHello(hello(["mapping.inspect"]), identity);
+
+  assert.deepEqual(
+    registry.getServerCapabilities("server_ls_01"),
+    ["mapping.inspect"]
+  );
 });
