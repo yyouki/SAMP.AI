@@ -21,7 +21,8 @@ import {
   ExecutionContextFactory,
   AgentRunner,
   InMemoryAgentConversationStore,
-  type ModelProvider
+  type ModelProvider,
+  OpenAIResponsesProvider
 } from "../src/index.js";
 
 const inputSchema = {
@@ -1155,4 +1156,213 @@ test("agent runner requires ai.use before calling a model provider", async () =>
   );
 
   assert.equal(providerCalled, false);
+});
+
+
+test("OpenAI Responses provider maps text and function-call output items", async () => {
+  let capturedUrl = "";
+  let capturedBody: Record<string, unknown> | undefined;
+  let capturedSignal: AbortSignal | null | undefined;
+
+  const fakeFetch: typeof fetch = async (input, init) => {
+    capturedUrl = String(input);
+    capturedBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    capturedSignal = init?.signal;
+
+    return new Response(JSON.stringify({
+      id: "resp_test_001",
+      status: "completed",
+      output: [
+        {
+          type: "message",
+          role: "assistant",
+          content: [{ type: "output_text", text: "Saya akan memeriksa mapping." }]
+        },
+        {
+          type: "function_call",
+          call_id: "call_scene_001",
+          name: "samp_0123456789abcdef01234567",
+          arguments: "{\"project_id\":\"hospital\"}"
+        }
+      ]
+    }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+
+  const provider = new OpenAIResponsesProvider({
+    apiKey: "test-key-not-real",
+    model: "test-model",
+    maxOutputTokens: 512,
+    fetcher: fakeFetch
+  });
+  const controller = new AbortController();
+
+  const result = await provider.complete({
+    systemInstructions: "You are SAMP.AI.",
+    messages: [{ role: "user", content: "Review the hospital mapping." }],
+    tools: [{
+      name: "samp_0123456789abcdef01234567",
+      description: "Inspect mapping objects.",
+      inputSchema: {
+        type: "object",
+        properties: { project_id: { type: "string" } },
+        required: ["project_id"],
+        additionalProperties: false
+      }
+    }],
+    signal: controller.signal
+  });
+
+  assert.equal(capturedUrl, "https://api.openai.com/v1/responses");
+  assert.equal(capturedSignal, controller.signal);
+  assert.equal(capturedBody?.model, "test-model");
+  assert.equal(capturedBody?.max_output_tokens, 512);
+  const sentTools = capturedBody?.tools as Array<Record<string, unknown>>;
+  assert.equal(sentTools[0]?.type, "function");
+  assert.equal(sentTools[0]?.strict, false);
+  assert.equal(result.content, "Saya akan memeriksa mapping.");
+  assert.deepEqual(result.toolCalls, [{
+    id: "call_scene_001",
+    name: "samp_0123456789abcdef01234567",
+    arguments: { project_id: "hospital" }
+  }]);
+});
+
+test("OpenAI Responses provider maps prior assistant tool calls and function outputs", async () => {
+  let capturedBody: Record<string, unknown> | undefined;
+
+  const fakeFetch: typeof fetch = async (_input, init) => {
+    capturedBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    return new Response(JSON.stringify({
+      id: "resp_test_002",
+      status: "completed",
+      output: [{
+        type: "message",
+        content: [{ type: "output_text", text: "Pemeriksaan selesai." }]
+      }]
+    }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  };
+
+  const provider = new OpenAIResponsesProvider({
+    apiKey: "test-key-not-real",
+    model: "test-model",
+    fetcher: fakeFetch
+  });
+
+  const result = await provider.complete({
+    systemInstructions: "You are SAMP.AI.",
+    messages: [
+      { role: "user", content: "Inspect this project." },
+      {
+        role: "assistant",
+        content: "I will inspect it.",
+        toolCalls: [{
+          id: "call_match_001",
+          name: "samp_aabbccddeeff001122334455",
+          arguments: { project_id: "city" }
+        }]
+      },
+      {
+        role: "tool",
+        toolCallId: "call_match_001",
+        name: "samp_aabbccddeeff001122334455",
+        content: "{\"ok\":true,\"result\":{}}"
+      }
+    ],
+    tools: [],
+    signal: new AbortController().signal
+  });
+
+  const input = capturedBody?.input as Array<Record<string, unknown>>;
+  const functionCall = input.find((item) => item.type === "function_call");
+  const functionOutput = input.find((item) => item.type === "function_call_output");
+
+  assert.equal(functionCall?.call_id, "call_match_001");
+  assert.equal(functionCall?.arguments, "{\"project_id\":\"city\"}");
+  assert.equal(functionOutput?.call_id, "call_match_001");
+  assert.equal(functionOutput?.output, "{\"ok\":true,\"result\":{}}");
+  assert.equal(result.content, "Pemeriksaan selesai.");
+  assert.equal(result.toolCalls, undefined);
+});
+
+test("OpenAI Responses provider rejects malformed function-call arguments", async () => {
+  const provider = new OpenAIResponsesProvider({
+    apiKey: "test-key-not-real",
+    model: "test-model",
+    fetcher: async () => new Response(JSON.stringify({
+      output: [{
+        type: "function_call",
+        call_id: "call_invalid",
+        name: "samp_invalid",
+        arguments: "{not-json"
+      }]
+    }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    })
+  });
+
+  await assert.rejects(
+    provider.complete({
+      systemInstructions: "",
+      messages: [{ role: "user", content: "Hello" }],
+      tools: [],
+      signal: new AbortController().signal
+    }),
+    (error: unknown) =>
+      error instanceof Error &&
+      "code" in error &&
+      error.code === "PROVIDER_INVALID_TOOL_ARGUMENTS"
+  );
+});
+
+test("OpenAI Responses provider reports HTTP errors without exposing the API key", async () => {
+  const apiKey = "test-secret-do-not-leak";
+  const provider = new OpenAIResponsesProvider({
+    apiKey,
+    model: "test-model",
+    fetcher: async () => new Response(JSON.stringify({
+      error: { message: "Invalid API key" }
+    }), {
+      status: 401,
+      headers: { "content-type": "application/json" }
+    })
+  });
+
+  await assert.rejects(
+    provider.complete({
+      systemInstructions: "",
+      messages: [{ role: "user", content: "Hello" }],
+      tools: [],
+      signal: new AbortController().signal
+    }),
+    (error: unknown) =>
+      error instanceof Error &&
+      error.message.includes("HTTP 401") &&
+      !error.message.includes(apiKey)
+  );
+});
+
+test("OpenAI Responses provider validates configuration", () => {
+  assert.throws(
+    () => new OpenAIResponsesProvider({
+      apiKey: " ",
+      model: "test-model"
+    }),
+    /API key is required/
+  );
+
+  assert.throws(
+    () => new OpenAIResponsesProvider({
+      apiKey: "test-key",
+      model: "test-model",
+      baseUrl: "file:///etc/passwd"
+    }),
+    /HTTP or HTTPS/
+  );
 });
