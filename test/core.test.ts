@@ -301,7 +301,12 @@ test("extension loader returns a disabled candidate using registered tool bindin
   assert.equal(candidate.manifest.id, "community.scene-auditor");
   assert.equal(candidate.skills.length, 1);
   assert.equal(candidate.skills[0]?.allowedTools[0], "community.scene-auditor.inspect");
-  assert.deepEqual(candidate.toolBindings, [{ id: "community.scene-auditor.inspect", implementationId: "mapping.inspect" }]);
+  assert.deepEqual(candidate.toolBindings, [{
+    id: "community.scene-auditor.inspect",
+    implementationId: "mapping.inspect",
+    requiredPermissions: ["mapping.view"],
+    requiredCapabilities: ["mapping.inspect"]
+  }]);
   assert.match(candidate.skills[0]?.instruction ?? "", /Do not modify/);
 });
 
