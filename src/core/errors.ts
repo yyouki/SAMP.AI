@@ -66,3 +66,9 @@ export class AuditRequiredError extends SampAiError {
     );
   }
 }
+
+export class ToolCancelledError extends SampAiError {
+  constructor(toolId: string) {
+    super(`Tool execution was cancelled: ${toolId}`, "TOOL_CANCELLED");
+  }
+}
