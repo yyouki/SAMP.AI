@@ -11,5 +11,8 @@ export * from "./adapters/mock/register-mock-tools.js";
 export * from "./extensions/extension-loader.js";
 export * from "./extensions/skill-registry.js";
 export * from "./extensions/skill-tool-dispatcher.js";
+export * from "./agent/contracts.js";
+export * from "./agent/in-memory-conversation-store.js";
+export * from "./agent/agent-runner.js";
 export type { LoadedToolBinding } from "./extensions/extension-loader.js";
 export * from "./shared/contracts.js";
