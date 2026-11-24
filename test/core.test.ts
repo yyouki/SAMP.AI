@@ -424,7 +424,7 @@ test("protocol validator accepts world coordinates with provenance", () => {
   }
 };
 
-  const result = validator.validateCoordinate<typeof coordinateSample>(coordinate);
+  const result = validator.validateCoordinate<{ frame: string; provenance: { source: string } }>(coordinate);
   assert.equal(result.frame, "world");
   assert.equal(result.provenance.source, "user_selected_point");
 });
