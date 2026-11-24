@@ -34,6 +34,8 @@ npm run build
 | `src/security/permission-engine.ts` | Permission, capability, autonomy, and approval gates |
 | `src/core/tool-executor.ts` | Validates and runs registered tools with timeout and audit hooks |
 | `src/extensions/extension-loader.ts` | Validates and loads declarative extension candidates |
+| `src/extensions/skill-registry.ts` | Tracks candidates, maintainer review, and per-server activation |
+| `src/extensions/skill-tool-dispatcher.ts` | Enforces skill tool allowlists before dispatch |
 | `src/adapters/mock/register-mock-tools.ts` | Deterministic mock mapping inspection tool |
 | `test/core.test.ts` | Initial core unit tests |
 
@@ -89,7 +91,7 @@ The mock tool is for tests and development. It does not connect to an open.mp se
 ## Important boundaries
 
 - The registry is in-memory; persistent tool/extension storage is not implemented.
-- The loader validates candidates but does not install or activate them.
+- The loader validates candidates but does not install or activate them. The in-memory skill registry provides an initial review/enable lifecycle with injected verifiers; production persistence and cryptographic review/owner tokens are still required.
 - The permission engine requires a trusted `ApprovalVerifier`; this repository does not yet contain a production signature/identity service.
 - The `ExecutionContext` must be created by trusted backend authentication and policy code. Never construct it from model output or an untrusted game-client request.
 - Tool handlers must honor their `AbortSignal`. A timeout stops awaiting the result but cannot forcibly stop JavaScript code that ignores cancellation.
