@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/yyouki/SAMP.AI/main/schemas/extensions/skill.schema.json",
+  "title": "SAMP.AI Declarative Skill",
+  "description": "A bounded workflow and instruction definition. A skill can call only explicitly declared, registered tools.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "description",
+    "instruction_file",
+    "allowed_tools",
+    "required_permissions",
+    "required_capabilities",
+    "triggers",
+    "default_mode",
+    "output_contract"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,63}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 80
+    },
+    "description": {
+      "type": "string",
+      "minLength": 20,
+      "maxLength": 500
+    },
+    "instruction_file": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$"
+    },
+    "allowed_tools": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]{2,100}$"
+      }
+    },
+    "required_permissions": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9_]*)+$"
+      }
+    },
+    "required_capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9_]*)+$"
+      }
+    },
+    "triggers": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "user_request",
+          "permitted_project_event",
+          "scheduled_review",
+          "editor_session"
+        ]
+      }
+    },
+    "default_mode": {
+      "enum": [
+        "read_only",
+        "draft_only"
+      ]
+    },
+    "output_contract": {
+      "enum": [
+        "conversation",
+        "markdown_report",
+        "structured_draft"
+      ]
+    },
+    "examples": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 300
+      }
+    }
+  }
+}
