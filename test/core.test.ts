@@ -311,12 +311,13 @@ test("extension loader rejects unknown tool implementations", async () => {
     registry
   );
   const temporaryDirectory = await mkdtemp(join(tmpdir(), "samp-ai-extension-"));
+  const candidateDirectory = join(temporaryDirectory, "candidate");
 
   try {
     const sourceDirectory = resolve(process.cwd(), "examples/extensions/scene-auditor");
-    await cp(sourceDirectory, temporaryDirectory, { recursive: true });
+    await cp(sourceDirectory, candidateDirectory, { recursive: true });
 
-    const manifestPath = join(temporaryDirectory, "extension.json");
+    const manifestPath = join(candidateDirectory, "extension.json");
     const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
       tools: Array<{ implementation: string }>;
     };
@@ -324,7 +325,7 @@ test("extension loader rejects unknown tool implementations", async () => {
     await writeFile(manifestPath, JSON.stringify(manifest, null, 2), "utf8");
 
     await assert.rejects(
-      loader.loadCandidate(temporaryDirectory),
+      loader.loadCandidate(candidateDirectory),
       /Tool implementation is not registered/
     );
   } finally {
