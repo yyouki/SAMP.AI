@@ -2,9 +2,7 @@ import { SampAiError } from "../core/errors.js";
 import { ProtocolValidator } from "../protocol/protocol-validator.js";
 
 export interface AuthenticatedAdapterIdentity {
-  /** Stable adapter identity supplied by trusted transport authentication. */
   readonly adapterId: string;
-  /** Server scope bound to the adapter credential, not copied from an untrusted client field. */
   readonly serverInstanceId: string;
 }
 
@@ -27,13 +25,16 @@ export interface RegisteredAdapter {
 
 export class AdapterRegistry {
   private readonly adapters = new Map<string, RegisteredAdapter>();
-
   private readonly supportedProtocols: ReadonlySet<string>;
 
   constructor(
     private readonly protocol: ProtocolValidator,
-    supportedProtocols: readonly string[] = ["sampai/0.1"]
+    supportedProtocols: readonly string[] = ["sampai/0.1"],
+    private readonly staleAfterMs = 60_000
   ) {
+    if (!Number.isFinite(staleAfterMs) || staleAfterMs < 1000) {
+      throw new Error("Adapter staleAfterMs must be at least 1000 milliseconds.");
+    }
     this.supportedProtocols = new Set(supportedProtocols);
   }
 
@@ -50,7 +51,6 @@ export class AdapterRegistry {
 
     const hello = this.protocol.validateAdapterHello(input);
 
-    // Bind protocol claims to identity established by the trusted transport layer.
     if (hello.server_instance_id !== authenticatedIdentity.serverInstanceId) {
       throw new SampAiError(
         "Adapter hello server identity does not match its authenticated credential.",
@@ -67,7 +67,7 @@ export class AdapterRegistry {
 
     if (!this.supportedProtocols.has(hello.protocol)) {
       throw new SampAiError(
-        `Unsupported adapter protocol version: ${hello.protocol}`,
+        "Unsupported adapter protocol version: " + hello.protocol,
         "PROTOCOL_VERSION_UNSUPPORTED"
       );
     }
@@ -98,21 +98,24 @@ export class AdapterRegistry {
       lastSeenAt: now
     });
 
-    // A new hello from the same authenticated adapter replaces its prior capability snapshot.
     this.adapters.set(key, registered);
     return registered;
   }
 
-  getAdapter(
-    serverInstanceId: string,
-    adapterId: string
-  ): RegisteredAdapter {
+  getAdapter(serverInstanceId: string, adapterId: string): RegisteredAdapter {
     const adapter = this.adapters.get(this.getKey(serverInstanceId, adapterId));
 
     if (!adapter) {
       throw new SampAiError(
-        `Adapter is not connected: ${adapterId}`,
+        "Adapter is not registered: " + adapterId,
         "ADAPTER_NOT_CONNECTED"
+      );
+    }
+
+    if (!this.isFresh(adapter)) {
+      throw new SampAiError(
+        "Adapter heartbeat expired; the adapter must reconnect with a new hello.",
+        "ADAPTER_STALE"
       );
     }
 
@@ -121,12 +124,14 @@ export class AdapterRegistry {
 
   getServerCapabilities(serverInstanceId: string): readonly string[] {
     const connected = [...this.adapters.values()].filter(
-      (adapter) => adapter.serverInstanceId === serverInstanceId
+      (adapter) =>
+        adapter.serverInstanceId === serverInstanceId &&
+        this.isFresh(adapter)
     );
 
     if (connected.length === 0) {
       throw new SampAiError(
-        `No authenticated adapter is connected for server: ${serverInstanceId}`,
+        "No active authenticated adapter is connected for server: " + serverInstanceId,
         "ADAPTER_NOT_CONNECTED"
       );
     }
@@ -147,22 +152,35 @@ export class AdapterRegistry {
 
     if (missing.length > 0) {
       throw new SampAiError(
-        `Server adapters do not provide: ${missing.join(", ")}`,
+        "Server adapters do not provide: " + missing.join(", "),
         "CAPABILITY_UNAVAILABLE"
       );
     }
   }
 
-  touch(
-    serverInstanceId: string,
-    adapterId: string
-  ): RegisteredAdapter {
-    const current = this.getAdapter(serverInstanceId, adapterId);
+  touch(serverInstanceId: string, adapterId: string): RegisteredAdapter {
+    const key = this.getKey(serverInstanceId, adapterId);
+    const current = this.adapters.get(key);
+
+    if (!current) {
+      throw new SampAiError(
+        "Adapter is not registered: " + adapterId,
+        "ADAPTER_NOT_CONNECTED"
+      );
+    }
+
+    if (!this.isFresh(current)) {
+      throw new SampAiError(
+        "Adapter heartbeat expired; send a new hello to reconnect.",
+        "ADAPTER_STALE"
+      );
+    }
+
     const updated = Object.freeze({
       ...current,
       lastSeenAt: new Date().toISOString()
     });
-    this.adapters.set(this.getKey(serverInstanceId, adapterId), updated);
+    this.adapters.set(key, updated);
     return updated;
   }
 
@@ -170,17 +188,40 @@ export class AdapterRegistry {
     return this.adapters.delete(this.getKey(serverInstanceId, adapterId));
   }
 
-  list(serverInstanceId?: string): readonly RegisteredAdapter[] {
+  pruneStale(): number {
+    let removed = 0;
+
+    for (const [key, adapter] of this.adapters) {
+      if (!this.isFresh(adapter)) {
+        this.adapters.delete(key);
+        removed += 1;
+      }
+    }
+
+    return removed;
+  }
+
+  list(
+    serverInstanceId?: string,
+    includeStale = false
+  ): readonly RegisteredAdapter[] {
     const records = [...this.adapters.values()].filter(
       (adapter) =>
-        serverInstanceId === undefined ||
-        adapter.serverInstanceId === serverInstanceId
+        (serverInstanceId === undefined ||
+          adapter.serverInstanceId === serverInstanceId) &&
+        (includeStale || this.isFresh(adapter))
     );
 
     return Object.freeze(records);
   }
 
+  private isFresh(adapter: RegisteredAdapter): boolean {
+    const lastSeen = Date.parse(adapter.lastSeenAt);
+    return Number.isFinite(lastSeen) &&
+      Date.now() - lastSeen <= this.staleAfterMs;
+  }
+
   private getKey(serverInstanceId: string, adapterId: string): string {
-    return `${serverInstanceId}::${adapterId}`;
+    return serverInstanceId + "::" + adapterId;
   }
 }
