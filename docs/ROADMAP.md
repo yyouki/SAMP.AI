@@ -28,6 +28,7 @@ This roadmap prioritizes a safe, testable end-to-end path before adding more ada
 - [ ] Implement conversation/session management.
 - [x] Add an in-memory tool registry with capability metadata.
 - [x] Add permission, autonomy, and approval-verifier gates for tool execution.
+- [x] Add a trusted execution-context factory backed by actor/policy resolvers and adapter capabilities.
 - [x] Add tool input/output validation, timeouts, and optional audit events.
 - [ ] Integrate a model provider and structured model tool-calling loop.
 - [ ] Implement signed approval receipts and persistent audit storage.
