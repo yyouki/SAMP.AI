@@ -1,4 +1,3 @@
-import type { AnySchema } from "ajv";
 import { JsonSchemaValidator } from "../validation/json-schema-validator.js";
 
 export interface ProtocolMessage {
