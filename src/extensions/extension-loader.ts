@@ -93,6 +93,16 @@ function sameStringSet(left: readonly string[], right: readonly string[]): boole
     left.every((value) => right.includes(value));
 }
 
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value as unknown as Record<string, unknown>)) {
+      deepFreeze(child);
+    }
+  }
+  return value;
+}
+
 export class ExtensionLoader {
   constructor(
     private readonly schemas: JsonSchemaValidator,
@@ -137,17 +147,21 @@ export class ExtensionLoader {
       });
     }
 
+    const immutableManifest = deepFreeze(structuredClone(manifest));
+    const immutableSkills = deepFreeze(skills);
+    const immutableBindings = deepFreeze(
+      manifest.tools.map((binding) => ({
+        id: binding.id,
+        implementationId: binding.implementation
+      }))
+    );
+
     return Object.freeze({
       status: "candidate" as const,
       rootDirectory: root,
-      manifest,
-      skills: Object.freeze(skills),
-      toolBindings: Object.freeze(
-        manifest.tools.map((binding) => ({
-          id: binding.id,
-          implementationId: binding.implementation
-        }))
-      )
+      manifest: immutableManifest,
+      skills: immutableSkills,
+      toolBindings: immutableBindings
     });
   }
 
@@ -222,9 +236,12 @@ export class ExtensionLoader {
         (capability) => !allowedCapabilities.has(capability)
       );
 
-      if (unusedSkillPermissions.length > 0 || unusedSkillCapabilities.length > 0) {
+      if (
+        !sameStringSet(skill.required_permissions, [...allowedPermissions]) ||
+        !sameStringSet(skill.required_capabilities, [...allowedCapabilities])
+      ) {
         throw new ExtensionLoadError(
-          `Skill ${skill.id} declares permissions or capabilities not used by its allowed tools.`
+          `Skill ${skill.id} permission and capability declarations must exactly match its allowed tools.`
         );
       }
 
@@ -251,6 +268,20 @@ export class ExtensionLoader {
     if (unusedPermissions.length > 0) {
       throw new ExtensionLoadError(
         `Extension requests unused permission(s): ${unusedPermissions.join(", ")}`
+      );
+    }
+
+    const allUsedCapabilities = new Set([
+      ...manifest.skills.flatMap((skill) => skill.required_capabilities),
+      ...manifest.tools.flatMap((tool) => tool.required_capabilities)
+    ]);
+    const unusedCapabilities = manifest.capabilities_required.filter(
+      (capability) => !allUsedCapabilities.has(capability)
+    );
+
+    if (unusedCapabilities.length > 0) {
+      throw new ExtensionLoadError(
+        `Extension requests unused capability/capabilities: ${unusedCapabilities.join(", ")}`
       );
     }
   }
