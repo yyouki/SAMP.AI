@@ -45,7 +45,7 @@ Mapping and TextDraw are initial skills, not the product boundary. Future skills
 
 The standalone core is initially implemented in TypeScript on Node.js 22 or later. This does not constrain game-mode languages: server integrations remain independent adapters using the versioned protocol.
 
-See [Core Implementation](docs/CORE_IMPLEMENTATION.md). Continuous integration runs type-checking, tests, and the TypeScript build on Node.js 22.
+See [Core Implementation](docs/CORE_IMPLEMENTATION.md) for setup and implementation boundaries. Continuous integration runs type-checking, tests, and the TypeScript build on Node.js 22.
 
 ## High-level architecture
 
