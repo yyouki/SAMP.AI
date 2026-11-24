@@ -10,7 +10,8 @@ This roadmap prioritizes a safe, testable end-to-end path before adding more ada
 - [ ] Set up contribution guidelines, code of conduct, and security reporting.
 
 ## Phase 1 — Protocol and test harness
-- [ ] Define JSON Schemas for message envelopes, coordinates, capabilities, drafts, operations, approvals, and execution results.
+- [ ] Define JSON Schemas for message envelopes, coordinates, capabilities, drafts, operations, approvals, execution results, and extension packages.
+- [x] Add initial extension manifest, skill, and tool-binding schemas.
 - [ ] Implement protocol validation.
 - [ ] Build a mock adapter that can simulate player state, anchors, markers, server objects, native-world removal directives, and failures.
 - [ ] Add contract tests so every adapter must pass the same protocol suite.
@@ -80,6 +81,7 @@ The protocol and conformance tests should lead; additional adapters should not i
 ## Phase 8 — Dashboard and ecosystem
 - [ ] Web dashboard for projects, conversation, previews, approvals, and audit.
 - [ ] Dynamic skill and typed-tool registry that is not limited to mapping/TextDraw.
+- [ ] AI-generated declarative skill candidates, mock evaluation runner, package diff, and maintainer review flow.
 - [ ] Extension manager and manifest format for community skills, tools, adapters, providers, catalogs, and UI components.
 - [ ] Per-extension permission, dependency, compatibility, and data-access review.
 - [ ] Provider configuration UI.
@@ -90,7 +92,7 @@ The protocol and conformance tests should lead; additional adapters should not i
 
 ## Long-term scope
 
-Mapping and TextDraw are the first end-to-end use cases, not permanent limits on the assistant. The extension system should make it possible to add new domains without rewriting the AI core. See [Extensibility and AI Autonomy](EXTENSIBILITY_AND_AUTONOMY.md).
+Mapping and TextDraw are the first end-to-end use cases, not permanent limits on the assistant. The extension system should make it possible to add new domains without rewriting the AI core. See [Extensibility and AI Autonomy](EXTENSIBILITY_AND_AUTONOMY.md) and [Self-Expanding Skills](SELF_EXPANDING_SKILLS.md).
 
 ## Non-goals for the first MVP
 
