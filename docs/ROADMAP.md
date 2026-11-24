@@ -26,13 +26,14 @@ This roadmap prioritizes a safe, testable end-to-end path before adding more ada
 ## Phase 2 — Minimal AI Core
 - [x] Define provider-neutral model and tool-call contracts.
 - [x] Add a bounded agent loop with a conversation-store interface.
-- [ ] Integrate one cloud or local model provider.
+- [x] Add an optional OpenAI Responses API provider adapter with injected fetch for testing.
+- [ ] Add another cloud or local model provider to verify provider portability.
 - [ ] Implement durable conversation/session storage.
 - [x] Add an in-memory tool registry with capability metadata.
 - [x] Add permission, autonomy, and approval-verifier gates for tool execution.
 - [x] Add a trusted execution-context factory backed by actor/policy resolvers and adapter capabilities.
 - [x] Add tool input/output validation, timeouts, and optional audit events.
-- [ ] Integrate a model provider and provider-specific structured tool calling.
+- [x] Integrate provider-specific Responses API function-call and function-output mapping.
 - [ ] Implement signed approval receipts and persistent audit storage.
 - [x] Add in-memory skill lifecycle: candidate → maintainer review → server-owner enablement.
 - [x] Enforce per-skill tool allowlists through a dedicated dispatcher.
