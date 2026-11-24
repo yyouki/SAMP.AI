@@ -1,4 +1,4 @@
-import type { JsonSchema } from "../shared/contracts.js";
+import type { ApprovalReceipt, JsonSchema } from "../shared/contracts.js";
 
 export type AgentMessage =
   | {
@@ -58,6 +58,9 @@ export interface AgentRunRequest extends AgentRunLimits {
   readonly projectId?: string;
   readonly sessionId: string;
   readonly userMessage: string;
+  /** Approval receipt loaded by trusted backend approval storage, never from model output. */
+  readonly approval?: ApprovalReceipt;
+  readonly draftHash?: string;
   readonly signal?: AbortSignal;
 }
 
