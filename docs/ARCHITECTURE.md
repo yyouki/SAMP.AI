@@ -53,10 +53,11 @@ The first standalone core runtime uses **TypeScript on Node.js 22+**. This choic
 
 The initial source scaffold provides:
 - an in-memory tool registry with immutable metadata snapshots;
-- JSON Schema validation using Ajv;
+- JSON Schema validation using Ajv, including protocol envelopes and coordinates;
 - permission, adapter-capability, autonomy, and approval checks;
 - a timed tool executor with optional audit events;
 - a declarative extension candidate loader with path containment checks;
+- protocol validators for adapter handshakes, message envelopes, and coordinate provenance;
 - a deterministic mock mapping-inspection tool and unit tests.
 
 The extension loader returns a **disabled candidate**. It does not install or activate extensions. The approval verifier is an injected interface; a production cryptographic approval service and persistent identity store are still required.
