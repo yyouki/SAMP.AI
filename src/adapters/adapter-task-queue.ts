@@ -444,7 +444,20 @@ export class AdapterTaskQueue {
         delete task.leaseToken;
         delete task.leaseExpiresAt;
 
-        if (task.attempts >= task.maxAttempts) {
+        const action = this.actions.get(task.actionId);
+
+        if (!action.idempotent) {
+          // A non-idempotent action may have completed before the adapter lost its result.
+          // Never dispatch it again automatically.
+          task.state = "failed";
+          task.result = {
+            status: "failed",
+            error: {
+              code: "TASK_OUTCOME_UNKNOWN",
+              message: "The adapter lease expired for a non-idempotent action. Inspect server state before retrying."
+            }
+          };
+        } else if (task.attempts >= task.maxAttempts) {
           task.state = "failed";
           task.result = {
             status: "failed",
@@ -483,6 +496,6 @@ export class AdapterTaskQueue {
     adapterId: string,
     idempotencyKey: string
   ): string {
-    return serverInstanceId + "::" + adapterId + "::" + idempotencyKey;
+    return JSON.stringify([serverInstanceId, adapterId, idempotencyKey]);
   }
 }
