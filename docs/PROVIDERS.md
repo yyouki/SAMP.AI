@@ -17,7 +17,8 @@ The implementation:
 - sends prior tool results as `function_call_output` items with the matching `call_id`;
 - accepts an injected fetch implementation for deterministic tests;
 - passes the agent AbortSignal to the HTTP request;
-- avoids logging or returning the API key in provider errors.
+- avoids logging or returning the API key in provider errors;
+- requires HTTPS for non-loopback provider URLs, allowing plain HTTP only for local development.
 
 OpenAI's official migration documentation states that the Assistants API was sunset on August 26, 2026 and directs new integrations to the Responses API. The Responses API returns output items and leaves application-managed tool-call loops to the integrating application. See the [official migration guide](https://platform.openai.com/docs/assistants/migration).
 
