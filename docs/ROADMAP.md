@@ -24,17 +24,20 @@ This roadmap prioritizes a safe, testable end-to-end path before adding more ada
 **Exit condition:** a mock server can connect, advertise capabilities, receive a validated draft, and return deterministic execution results.
 
 ## Phase 2 — Minimal AI Core
-- [ ] Implement provider interface and one provider.
-- [ ] Implement conversation/session management.
+- [x] Define provider-neutral model and tool-call contracts.
+- [x] Add a bounded agent loop with a conversation-store interface.
+- [ ] Integrate one cloud or local model provider.
+- [ ] Implement durable conversation/session storage.
 - [x] Add an in-memory tool registry with capability metadata.
 - [x] Add permission, autonomy, and approval-verifier gates for tool execution.
 - [x] Add a trusted execution-context factory backed by actor/policy resolvers and adapter capabilities.
 - [x] Add tool input/output validation, timeouts, and optional audit events.
-- [ ] Integrate a model provider and structured model tool-calling loop.
+- [ ] Integrate a model provider and provider-specific structured tool calling.
 - [ ] Implement signed approval receipts and persistent audit storage.
 - [x] Add in-memory skill lifecycle: candidate → maintainer review → server-owner enablement.
 - [x] Enforce per-skill tool allowlists through a dedicated dispatcher.
-- [ ] Add usage budgets and cancellation propagation across model calls.
+- [x] Add bounded steps/tool calls, time budget, and cancellation propagation to tool handlers.
+- [ ] Add provider token/cost usage budgets.
 
 **Exit condition:** AI can discuss a request, ask clarifying questions, produce a structured plan, and cannot apply it without approval.
 
