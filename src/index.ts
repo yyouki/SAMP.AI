@@ -7,6 +7,8 @@ export * from "./validation/json-schema-validator.js";
 export * from "./validation/create-default-schema-validator.js";
 export * from "./protocol/protocol-validator.js";
 export * from "./adapters/adapter-registry.js";
+export * from "./adapters/adapter-action-registry.js";
+export * from "./adapters/adapter-task-queue.js";
 export * from "./adapters/bearer-adapter-authenticator.js";
 export * from "./protocol/http-adapter-gateway.js";
 export * from "./adapters/mock/register-mock-tools.js";
