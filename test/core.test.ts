@@ -432,3 +432,29 @@ test("protocol validator requires an anchor for local coordinates", () => {
     /anchor_id/
   );
 });
+
+
+test("executor can resolve an implementation ID for extension tool bindings", async () => {
+  const registry = new ToolRegistry();
+  registry.register(createReadTool());
+
+  const executor = new ToolExecutor(
+    registry,
+    new PermissionEngine({ verify: async () => true }),
+    new JsonSchemaValidator()
+  );
+
+  const result = await executor.executeImplementation<{ projectId: string; count: number }>(
+    "project.inspect",
+    { projectId: "hospital" },
+    {
+      actor: { id: "mapper-01", permissions: ["project.view"] },
+      serverInstanceId: "server-test",
+      projectId: "hospital",
+      adapterCapabilities: ["project.inspect"],
+      autonomy: "observe"
+    }
+  );
+
+  assert.deepEqual(result, { projectId: "hospital", count: 2 });
+});
