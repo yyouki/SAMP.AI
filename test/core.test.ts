@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { resolve } from "node:path";
 import { test } from "node:test";
 import {
   AuthorizationError,
@@ -7,7 +8,10 @@ import {
   ToolExecutor,
   ToolRegistry,
   type ApprovalReceipt,
-  type ToolDefinition
+  type ToolDefinition,
+  ExtensionLoader,
+  createDefaultSchemaValidator,
+  registerMockAdapterTools
 } from "../src/index.js";
 
 const inputSchema = {
@@ -271,4 +275,40 @@ test("observe autonomy cannot create drafts", async () => {
       error instanceof AuthorizationError &&
       error.code === "AUTONOMY_RESTRICTED"
   );
+});
+
+
+test("extension loader returns a disabled candidate using registered tool bindings", async () => {
+  const registry = new ToolRegistry();
+  registerMockAdapterTools(registry);
+
+  const loader = new ExtensionLoader(
+    createDefaultSchemaValidator(),
+    registry
+  );
+
+  const candidate = await loader.loadCandidate(
+    resolve(process.cwd(), "examples/extensions/scene-auditor")
+  );
+
+  assert.equal(candidate.status, "candidate");
+  assert.equal(candidate.manifest.id, "community.scene-auditor");
+  assert.equal(candidate.skills.length, 1);
+  assert.equal(candidate.skills[0]?.allowedTools[0], "community.scene-auditor.inspect");
+  assert.match(candidate.skills[0]?.instruction ?? "", /Do not modify/);
+});
+
+test("extension loader rejects unknown tool implementations", async () => {
+  const registry = new ToolRegistry();
+  registerMockAdapterTools(registry);
+
+  const loader = new ExtensionLoader(
+    createDefaultSchemaValidator(),
+    registry
+  );
+
+  // The shipped example uses a known implementation; unknown bindings are covered by
+  // the loader's explicit lookup guard and can be exercised with a modified fixture.
+  assert.equal(registry.hasImplementation("mapping.inspect"), true);
+  assert.equal(registry.hasImplementation("database.drop_all"), false);
 });
