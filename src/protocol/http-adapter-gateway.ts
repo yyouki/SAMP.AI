@@ -33,13 +33,59 @@ class HttpRequestError extends Error {
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseTaskResult(value: unknown): AdapterTaskResult {
+  if (!isRecord(value)) {
+    throw new HttpRequestError("Task result must be a JSON object.", 400);
+  }
+
+  if (
+    value.status !== "succeeded" &&
+    value.status !== "partially_succeeded" &&
+    value.status !== "failed"
+  ) {
+    throw new HttpRequestError("Task result status is invalid.", 400);
+  }
+
+  if (value.status === "failed") {
+    if (
+      !isRecord(value.error) ||
+      typeof value.error.code !== "string" ||
+      typeof value.error.message !== "string"
+    ) {
+      throw new HttpRequestError("Failed task results require error.code and error.message.", 400);
+    }
+
+    return {
+      status: "failed",
+      error: {
+        code: value.error.code,
+        message: value.error.message
+      }
+    };
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(value, "output")) {
+    throw new HttpRequestError("Successful task results require an output field.", 400);
+  }
+
+  return {
+    status: value.status,
+    output: value.output
+  };
+}
+
 export class HttpAdapterGateway {
   private server?: Server;
 
   constructor(
     private readonly adapters: AdapterRegistry,
     private readonly authenticator: AdapterAuthenticator,
-    private readonly options: HttpAdapterGatewayOptions = {}
+    private readonly options: HttpAdapterGatewayOptions = {},
+    private readonly tasks?: AdapterTaskQueue
   ) {}
 
   async listen(
@@ -106,10 +152,16 @@ export class HttpAdapterGateway {
       return;
     }
 
+    const taskRoute = /^\\/v1\\/adapters\\/tasks\\/([0-9a-f-]{36})\\/(renew|result)$/i.exec(path);
+    const isTaskRoute =
+      path === "/v1/adapters/tasks/next" ||
+      taskRoute !== null;
+
     if (
       path !== "/v1/adapters/hello" &&
       path !== "/v1/adapters/heartbeat" &&
-      path !== "/v1/adapters/me"
+      path !== "/v1/adapters/me" &&
+      !isTaskRoute
     ) {
       this.sendJson(response, 404, {
         error: { code: "NOT_FOUND", message: "Route not found." }
@@ -201,6 +253,76 @@ export class HttpAdapterGateway {
         return;
       }
 
+      if (isTaskRoute && !this.tasks) {
+        this.sendJson(response, 503, {
+          error: { code: "TASK_QUEUE_UNAVAILABLE", message: "Adapter task queue is not configured." }
+        });
+        return;
+      }
+
+      if (request.method === "GET" && path === "/v1/adapters/tasks/next") {
+        // Polling also refreshes the adapter's liveness.
+        this.adapters.touch(identity.serverInstanceId, identity.adapterId);
+
+        const task = this.tasks!.claimNext(
+          identity.serverInstanceId,
+          identity.adapterId
+        );
+
+        if (!task) {
+          response.writeHead(204, {
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff"
+          });
+          response.end();
+          return;
+        }
+
+        this.sendJson(response, 200, {
+          ok: true,
+          task
+        });
+        return;
+      }
+
+      if (taskRoute && request.method === "POST") {
+        this.assertJsonContentType(request);
+        const body = await this.readJsonBody(request);
+        if (!isRecord(body) || typeof body.lease_token !== "string") {
+          throw new HttpRequestError("Request requires a lease_token.", 400);
+        }
+
+        const taskId = taskRoute[1]!;
+        const operation = taskRoute[2]!;
+
+        if (operation === "renew") {
+          const task = this.tasks!.renewLease(
+            identity.serverInstanceId,
+            identity.adapterId,
+            taskId,
+            body.lease_token
+          );
+
+          this.sendJson(response, 200, { ok: true, task });
+          return;
+        }
+
+        const result = parseTaskResult(body.result);
+        const completed = this.tasks!.complete(
+          identity.serverInstanceId,
+          identity.adapterId,
+          taskId,
+          body.lease_token,
+          result
+        );
+
+        this.sendJson(response, 200, {
+          ok: true,
+          task: completed
+        });
+        return;
+      }
+
       this.sendJson(response, 405, {
         error: { code: "METHOD_NOT_ALLOWED", message: "Method not allowed." }
       });
@@ -217,6 +339,10 @@ export class HttpAdapterGateway {
           error.code === "ADAPTER_IDENTITY_MISMATCH" ? 403 :
           error.code === "ADAPTER_NOT_CONNECTED" ? 404 :
           error.code === "ADAPTER_STALE" ? 503 :
+          error.code === "TASK_QUEUE_FULL" ? 429 :
+          error.code === "TASK_NOT_FOUND" ? 404 :
+          error.code === "TASK_LEASE_INVALID" ? 409 :
+          error.code === "TASK_EXPIRED" ? 409 :
           error.code === "PROTOCOL_VERSION_UNSUPPORTED" ? 426 : 400;
 
         this.sendJson(response, statusCode, {
