@@ -24,43 +24,44 @@ export class ToolExecutor {
     const tool = this.registry.get(toolId);
 
     // Authorization is checked before revealing schema details or invoking code.
-    await this.permissions.assertAuthorized(tool, context);
+    try {
+      await this.permissions.assertAuthorized(tool, context);
+    } catch (error) {
+      await this.writeAudit({
+        event: "tool.denied",
+        toolId: tool.id,
+        actorId: context.actor.id,
+        serverInstanceId: context.serverInstanceId,
+        ...(context.projectId ? { projectId: context.projectId } : {}),
+        timestamp: new Date().toISOString(),
+        details: {
+          code: error instanceof Error && "code" in error
+            ? String((error as { code: unknown }).code)
+            : "AUTHORIZATION_FAILED"
+        }
+      });
+      throw error;
+    }
 
     this.schemas.assert(tool.inputSchema, input, `input for ${tool.id}`);
 
-    const startedAt = new Date().toISOString();
+    // Persist the start event before any side effect. A configured audit sink is fail-closed.
     await this.writeAudit({
       event: "tool.started",
       toolId: tool.id,
       actorId: context.actor.id,
       serverInstanceId: context.serverInstanceId,
       ...(context.projectId ? { projectId: context.projectId } : {}),
-      timestamp: startedAt
+      timestamp: new Date().toISOString()
     });
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), tool.timeoutMs);
+    let output: unknown;
 
     try {
-      const output = await this.invokeWithTimeout(
-        tool,
-        input,
-        context,
-        controller
-      );
-
+      output = await this.invokeWithTimeout(tool, input, context, controller);
       this.schemas.assert(tool.outputSchema, output, `output from ${tool.id}`);
-
-      await this.writeAudit({
-        event: "tool.succeeded",
-        toolId: tool.id,
-        actorId: context.actor.id,
-        serverInstanceId: context.serverInstanceId,
-        ...(context.projectId ? { projectId: context.projectId } : {}),
-        timestamp: new Date().toISOString()
-      });
-
-      return output as TOutput;
     } catch (error) {
       await this.writeAudit({
         event: "tool.failed",
@@ -77,6 +78,18 @@ export class ToolExecutor {
     } finally {
       clearTimeout(timeout);
     }
+
+    // Keep success-audit failures separate: the tool may already have completed.
+    await this.writeAudit({
+      event: "tool.succeeded",
+      toolId: tool.id,
+      actorId: context.actor.id,
+      serverInstanceId: context.serverInstanceId,
+      ...(context.projectId ? { projectId: context.projectId } : {}),
+      timestamp: new Date().toISOString()
+    });
+
+    return output as TOutput;
   }
 
   private async invokeWithTimeout(
@@ -85,10 +98,7 @@ export class ToolExecutor {
     context: ExecutionContext,
     controller: AbortController
   ): Promise<unknown> {
-    let rejectTimeout: ((reason: Error) => void) | undefined;
-
     const timeoutPromise = new Promise<never>((_resolve, reject) => {
-      rejectTimeout = reject;
       controller.signal.addEventListener(
         "abort",
         () => reject(new ToolTimeoutError(tool.id, tool.timeoutMs)),
@@ -105,17 +115,12 @@ export class ToolExecutor {
       })
     );
 
-    try {
-      return await Promise.race([executionPromise, timeoutPromise]);
-    } finally {
-      rejectTimeout = undefined;
-    }
+    return Promise.race([executionPromise, timeoutPromise]);
   }
 
   private async writeAudit(
     event: Parameters<AuditSink["write"]>[0]
   ): Promise<void> {
-    // Fail closed when an audit sink is configured but unavailable.
     await this.audit?.write(event);
   }
 }
