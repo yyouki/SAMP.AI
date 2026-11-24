@@ -49,6 +49,8 @@ export interface ExecutionContext {
   readonly autoAllowedToolIds?: readonly string[];
   readonly draftHash?: string;
   readonly approval?: ApprovalReceipt;
+  /** Cancellation signal inherited from an agent request. */
+  readonly signal?: AbortSignal;
 }
 
 export interface ToolHandlerContext {
