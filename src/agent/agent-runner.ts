@@ -90,7 +90,8 @@ export class AgentRunner {
       executionContext = await this.contexts.create(
         request.principal,
         request.serverInstanceId,
-        request.projectId
+        request.projectId,
+        { signal: controller.signal }
       );
     } catch (error) {
       clearTimeout(timer);
@@ -104,6 +105,11 @@ export class AgentRunner {
     const skillInstructions: string[] = [];
 
     for (const enabled of enabledSkills) {
+      const skillCapabilitiesAvailable = enabled.skill.requiredCapabilities.every(
+        (capability) => executionContext.adapterCapabilities.includes(capability)
+      );
+      if (!skillCapabilitiesAvailable) continue;
+
       const availableBindings = enabled.toolBindings.filter((binding) =>
         enabled.skill.allowedTools.includes(binding.id) &&
         binding.requiredPermissions.every((permission) =>
@@ -157,14 +163,16 @@ export class AgentRunner {
     let toolCalls = 0;
     let response = "";
     let stoppedBecause: AgentRunResult["stoppedBecause"] = "completed";
+    let completed = false;
 
     try {
-      for (; steps < maxSteps; steps += 1) {
+      for (let step = 1; step <= maxSteps; step += 1) {
         if (controller.signal.aborted) {
           stoppedBecause = request.signal?.aborted ? "cancelled" : "timeout";
           break;
         }
 
+        steps = step;
         const providerResponse = await this.provider.complete({
           systemInstructions,
           messages: Object.freeze([...messages]),
@@ -183,6 +191,7 @@ export class AgentRunner {
         response = providerResponse.content ?? "";
 
         if (calls.length === 0) {
+          completed = true;
           stoppedBecause = "completed";
           break;
         }
@@ -207,22 +216,22 @@ export class AgentRunner {
         if (stoppedBecause === "max_tool_calls") break;
       }
 
-      if (steps >= maxSteps && stoppedBecause === "completed" && response === "") {
+      if (!completed && stoppedBecause === "completed") {
         stoppedBecause = "max_steps";
       }
 
-      if (controller.signal.aborted && stoppedBecause === "completed") {
+      if (controller.signal.aborted) {
         stoppedBecause = request.signal?.aborted ? "cancelled" : "timeout";
       }
 
-      if (!response && stoppedBecause !== "completed") {
-        response = stoppedBecause === "timeout"
-          ? "The agent reached its time budget. Continue the session to resume."
-          : stoppedBecause === "cancelled"
-            ? "The request was cancelled."
-            : stoppedBecause === "max_tool_calls"
-              ? "The agent reached its tool-call limit. Review the results and continue the session if needed."
-              : "The agent reached its step limit. Continue the session to proceed.";
+      if (stoppedBecause === "max_steps") {
+        response = "The agent reached its step limit. Tool results have been retained; continue the session to proceed.";
+      } else if (stoppedBecause === "max_tool_calls") {
+        response = "The agent reached its tool-call limit. Tool results have been retained; continue the session if more work is needed.";
+      } else if (stoppedBecause === "timeout") {
+        response = "The agent reached its time budget. Continue the session to resume.";
+      } else if (stoppedBecause === "cancelled") {
+        response = "The request was cancelled.";
       }
 
       if (response) {
@@ -239,7 +248,30 @@ export class AgentRunner {
       return Object.freeze({
         conversationKey,
         response,
-        steps: Math.min(steps + (steps < maxSteps ? 1 : 0), maxSteps),
+        steps,
+        toolCalls,
+        stoppedBecause
+      });
+    } catch (error) {
+      if (!controller.signal.aborted) throw error;
+
+      stoppedBecause = request.signal?.aborted ? "cancelled" : "timeout";
+      response = stoppedBecause === "cancelled"
+        ? "The request was cancelled."
+        : "The agent reached its time budget. Continue the session to resume.";
+
+      if (response) {
+        const finalMessage: AgentMessage = { role: "assistant", content: response };
+        pendingMessages.push(finalMessage);
+        messages.push(finalMessage);
+      }
+
+      await this.conversations.append(conversationKey, pendingMessages);
+
+      return Object.freeze({
+        conversationKey,
+        response,
+        steps,
         toolCalls,
         stoppedBecause
       });
