@@ -378,7 +378,7 @@ export class AgentRunner {
         context
       );
 
-      const serialized = JSON.stringify({ ok: true, result });
+      const serialized = JSON.stringify({ ok: true, result }) ?? "{}";
       if (serialized.length > 20_000) {
         return {
           role: "tool",
