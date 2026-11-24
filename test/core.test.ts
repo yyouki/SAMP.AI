@@ -13,7 +13,8 @@ import {
   type ToolDefinition,
   ExtensionLoader,
   createDefaultSchemaValidator,
-  registerMockAdapterTools
+  registerMockAdapterTools,
+  ProtocolValidator
 } from "../src/index.js";
 
 const inputSchema = {
