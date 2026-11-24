@@ -17,7 +17,8 @@ import {
   ProtocolValidator,
   AdapterRegistry,
   SkillRegistry,
-  SkillToolDispatcher
+  SkillToolDispatcher,
+  ExecutionContextFactory
 } from "../src/index.js";
 
 const inputSchema = {
@@ -752,5 +753,99 @@ test("skill dispatcher enforces skill tool allowlist and executes implementation
       }
     ),
     /not allowed for skill/
+  );
+});
+
+
+test("execution context factory uses backend permissions and registered adapter capabilities", async () => {
+  const adapterRegistry = new AdapterRegistry(
+    new ProtocolValidator(createDefaultSchemaValidator())
+  );
+
+  adapterRegistry.registerHello({
+    protocol: "sampai/0.1",
+    message_id: "hello_factory_001",
+    type: "event",
+    server_instance_id: "server-factory",
+    timestamp: "2026-11-24T15:00:00Z",
+    event: "adapter.hello",
+    payload: {
+      adapter: {
+        name: "sampai-pawn",
+        version: "0.1.0",
+        runtime: "open.mp"
+      },
+      capabilities: ["mapping.inspect", "mapping.create_marker"],
+      limits: {
+        max_operations_per_batch: 20,
+        max_objects_per_project: 1000
+      }
+    }
+  }, {
+    adapterId: "sampai-pawn",
+    serverInstanceId: "server-factory"
+  });
+
+  const factory = new ExecutionContextFactory(
+    adapterRegistry,
+    {
+      resolve: async (actorId) => ({
+        id: actorId,
+        permissions: ["mapping.view", "mapping.create"]
+      })
+    },
+    {
+      resolve: async () => ({
+        mode: "apply_with_approval",
+        autoAllowedToolIds: []
+      })
+    }
+  );
+
+  const context = await factory.create(
+    { subject: "admin-42" },
+    "server-factory",
+    "city-project",
+    { draftHash: "sha256:revision-001", approval }
+  );
+
+  assert.deepEqual(context.actor.permissions, ["mapping.view", "mapping.create"]);
+  assert.ok(context.adapterCapabilities.includes("mapping.inspect"));
+  assert.equal(context.projectId, "city-project");
+  assert.equal(context.draftHash, "sha256:revision-001");
+  assert.equal(context.approval?.approvalId, "approval-001");
+  assert.equal(context.autonomy, "apply_with_approval");
+});
+
+test("execution context factory rejects an actor resolver identity mismatch", async () => {
+  const adapterRegistry = new AdapterRegistry(
+    new ProtocolValidator(createDefaultSchemaValidator())
+  );
+  adapterRegistry.registerHello({
+    protocol: "sampai/0.1",
+    message_id: "hello_factory_002",
+    type: "event",
+    server_instance_id: "server-factory",
+    timestamp: "2026-11-24T15:00:00Z",
+    event: "adapter.hello",
+    payload: {
+      adapter: { name: "sampai-pawn", version: "0.1.0", runtime: "open.mp" },
+      capabilities: ["mapping.inspect"],
+      limits: { max_operations_per_batch: 20, max_objects_per_project: 1000 }
+    }
+  }, {
+    adapterId: "sampai-pawn",
+    serverInstanceId: "server-factory"
+  });
+
+  const factory = new ExecutionContextFactory(
+    adapterRegistry,
+    { resolve: async () => ({ id: "different-user", permissions: ["mapping.view"] }) },
+    { resolve: async () => ({ mode: "observe", autoAllowedToolIds: [] }) }
+  );
+
+  await assert.rejects(
+    factory.create({ subject: "admin-42" }, "server-factory"),
+    /different from the authenticated principal/
   );
 });
