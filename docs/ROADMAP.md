@@ -13,6 +13,7 @@ This roadmap prioritizes a safe, testable end-to-end path before adding more ada
 - [ ] Define JSON Schemas for message envelopes, coordinates, capabilities, drafts, operations, approvals, execution results, and extension packages.
 - [x] Add initial extension manifest, skill, and tool-binding schemas.
 - [ ] Implement full protocol envelope and event validation.
+- [x] Add CI workflow for source/test type-checking, unit tests, and TypeScript build.
 - [x] Add reusable JSON Schema validation for extension schemas.
 - [ ] Build a mock adapter that can simulate player state, anchors, markers, server objects, native-world removal directives, and failures.
 - [ ] Add contract tests so every adapter must pass the same protocol suite.
