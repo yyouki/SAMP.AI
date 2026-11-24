@@ -1,0 +1,28 @@
+{
+  "protocol": "sampai/0.1",
+  "message_id": "hello_pawn_001",
+  "type": "event",
+  "server_instance_id": "server_ls_01",
+  "timestamp": "2026-11-24T15:00:00Z",
+  "event": "adapter.hello",
+  "payload": {
+    "adapter": {
+      "name": "sampai-pawn",
+      "version": "0.1.0",
+      "runtime": "open.mp",
+      "runtime_version": "reported-by-adapter"
+    },
+    "capabilities": [
+      "context.player_position",
+      "context.player_facing",
+      "mapping.create_object",
+      "mapping.inspect",
+      "mapping.create_marker",
+      "mapping.remove_marker"
+    ],
+    "limits": {
+      "max_operations_per_batch": 20,
+      "max_objects_per_project": 1000
+    }
+  }
+}
