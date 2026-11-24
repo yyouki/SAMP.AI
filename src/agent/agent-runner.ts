@@ -141,6 +141,8 @@ export class AgentRunner {
     }
 
     if (!executionContext.actor.permissions.includes("ai.use")) {
+      clearTimeout(timer);
+      request.signal?.removeEventListener("abort", relayAbort);
       throw new AuthorizationError(
         "The authenticated actor does not have permission to use SAMP.AI.",
         "PERMISSION_DENIED"
