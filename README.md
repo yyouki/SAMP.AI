@@ -4,7 +4,7 @@
 
 SAMP.AI is intended to help server owners and developers design, inspect, preview, and manage in-game content such as map objects and TextDraw interfaces. It is designed as a collaborative assistant: it can propose ideas proactively, but it must discuss uncertain requirements and obtain the required approval before applying changes.
 
-**Project status: Early core scaffold.** The repository contains initial TypeScript core primitives, extension schemas, a declarative extension loader, and tests. A production AI agent, live open.mp adapter, model provider, and runtime installer are not implemented yet.
+**Project status: Early core scaffold.** The repository contains TypeScript core primitives, protocol/extension schemas, adapter and skill registries, a declarative extension loader, a bounded provider-neutral agent loop, and an optional OpenAI Responses API provider. A live open.mp adapter, persistent storage, production authentication/approval services, and runtime installer are not implemented yet.
 
 ## Project goals
 
@@ -40,6 +40,12 @@ SAMP.AI is intended to help server owners and developers design, inspect, previe
 
 ### Extensible development skills
 Mapping and TextDraw are initial skills, not the product boundary. Future skills may cover diagnostics, code and resource assistance, database planning, performance analysis, gameplay systems, NPCs, testing, documentation, and controlled deployment workflows. See [Extensibility and AI Autonomy](docs/EXTENSIBILITY_AND_AUTONOMY.md).
+
+## Model providers
+
+The core exposes a provider-neutral interface. An optional OpenAI Responses API adapter is included as the first provider; other providers can be added independently. The API key must stay on the backend and must never be placed in Pawn scripts, game clients, or public configuration files.
+
+See [Provider setup](docs/PROVIDERS.md).
 
 ## Core runtime
 
