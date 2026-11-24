@@ -75,11 +75,17 @@ export interface LoadedSkill {
   readonly allowedTools: readonly string[];
 }
 
+export interface LoadedToolBinding {
+  readonly id: string;
+  readonly implementationId: string;
+}
+
 export interface ExtensionCandidate {
   readonly status: "candidate";
   readonly rootDirectory: string;
   readonly manifest: ExtensionManifest;
   readonly skills: readonly LoadedSkill[];
+  readonly toolBindings: readonly LoadedToolBinding[];
 }
 
 const RISK_SCORE: Record<RiskLevel, number> = {
@@ -137,7 +143,13 @@ export class ExtensionLoader {
       status: "candidate" as const,
       rootDirectory: root,
       manifest,
-      skills: Object.freeze(skills)
+      skills: Object.freeze(skills),
+      toolBindings: Object.freeze(
+        manifest.tools.map((binding) => ({
+          id: binding.id,
+          implementationId: binding.implementation
+        }))
+      )
     });
   }
 
