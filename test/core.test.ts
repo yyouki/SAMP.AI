@@ -818,7 +818,7 @@ test("execution context factory uses backend permissions and registered adapter 
   assert.deepEqual(context.actor.permissions, ["mapping.view", "mapping.create"]);
   assert.ok(context.adapterCapabilities.includes("mapping.inspect"));
   assert.equal(context.projectId, "city-project");
-  assert.equal(context.draftHash, "sha256:revision-001");
+  assert.equal(context.draftHash, approval.draftHash);
   assert.equal(context.approval?.approvalId, "approval-001");
   assert.equal(context.autonomy, "apply_with_approval");
 });
@@ -846,7 +846,7 @@ test("execution context factory rejects an actor resolver identity mismatch", as
 
   const factory = new ExecutionContextFactory(
     adapterRegistry,
-    { resolve: async () => ({ id: "different-user", permissions: ["mapping.view"] }) },
+    { resolve: async () => ({ id: "different-user", permissions: ["ai.use", "mapping.view"] }) },
     { resolve: async () => ({ mode: "observe", autoAllowedToolIds: [] }) }
   );
 
@@ -1085,4 +1085,74 @@ test("agent runner cannot call a tool absent from the current enabled skill set"
 
   assert.equal(result.toolCalls, 1);
   assert.ok(result.response.includes("unavailable") || result.response.includes("cannot"));
+});
+
+
+test("agent runner requires ai.use before calling a model provider", async () => {
+  const registry = new ToolRegistry();
+  registerMockAdapterTools(registry);
+  const skills = new SkillRegistry(
+    { verify: async () => true },
+    { verify: async () => true }
+  );
+  const adapterRegistry = new AdapterRegistry(
+    new ProtocolValidator(createDefaultSchemaValidator())
+  );
+  adapterRegistry.registerHello({
+    protocol: "sampai/0.1",
+    message_id: "hello_ai_permission",
+    type: "event",
+    server_instance_id: "server-ai-permission",
+    timestamp: "2026-11-24T15:00:00Z",
+    event: "adapter.hello",
+    payload: {
+      adapter: { name: "sampai-pawn", version: "0.1.0", runtime: "open.mp" },
+      capabilities: ["mapping.inspect"],
+      limits: { max_operations_per_batch: 20, max_objects_per_project: 1000 }
+    }
+  }, {
+    adapterId: "sampai-pawn",
+    serverInstanceId: "server-ai-permission"
+  });
+
+  const contexts = new ExecutionContextFactory(
+    adapterRegistry,
+    { resolve: async (actorId) => ({ id: actorId, permissions: ["mapping.view"] }) },
+    { resolve: async () => ({ mode: "observe", autoAllowedToolIds: [] }) }
+  );
+
+  let providerCalled = false;
+  const runner = new AgentRunner(
+    {
+      complete: async () => {
+        providerCalled = true;
+        return { content: "This should not be called." };
+      }
+    },
+    new InMemoryAgentConversationStore(),
+    skills,
+    new SkillToolDispatcher(
+      skills,
+      new ToolExecutor(
+        registry,
+        new PermissionEngine({ verify: async () => true }),
+        new JsonSchemaValidator()
+      )
+    ),
+    contexts
+  );
+
+  await assert.rejects(
+    runner.run({
+      principal: { subject: "guest-01" },
+      serverInstanceId: "server-ai-permission",
+      sessionId: "no-ai-access",
+      userMessage: "Hello."
+    }),
+    (error: unknown) =>
+      error instanceof AuthorizationError &&
+      error.code === "PERMISSION_DENIED"
+  );
+
+  assert.equal(providerCalled, false);
 });
