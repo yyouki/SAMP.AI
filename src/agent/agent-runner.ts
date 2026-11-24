@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { SampAiError } from "../core/errors.js";
+import { AuthorizationError, SampAiError } from "../core/errors.js";
 import { ExecutionContextFactory } from "../security/execution-context-factory.js";
 import { SkillRegistry } from "../extensions/skill-registry.js";
 import { SkillToolDispatcher } from "../extensions/skill-tool-dispatcher.js";
@@ -138,6 +138,13 @@ export class AgentRunner {
       clearTimeout(timer);
       request.signal?.removeEventListener("abort", relayAbort);
       throw error;
+    }
+
+    if (!executionContext.actor.permissions.includes("ai.use")) {
+      throw new AuthorizationError(
+        "The authenticated actor does not have permission to use SAMP.AI.",
+        "PERMISSION_DENIED"
+      );
     }
 
     const enabledSkills = this.skills.listEnabledSkills(request.serverInstanceId);
