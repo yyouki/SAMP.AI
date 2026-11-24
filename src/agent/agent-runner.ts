@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { SampAiError } from "../core/errors.js";
 import { ExecutionContextFactory } from "../security/execution-context-factory.js";
 import { SkillRegistry } from "../extensions/skill-registry.js";
@@ -7,11 +8,11 @@ import type {
   AgentMessage,
   AgentRunRequest,
   AgentRunResult,
+  ConversationStore,
   ModelProvider,
   ProviderTool,
   ProviderToolCall
 } from "./contracts.js";
-import type { ConversationStore } from "./contracts.js";
 
 const DEFAULT_MAX_STEPS = 6;
 const HARD_MAX_STEPS = 12;
@@ -24,6 +25,27 @@ interface ToolRoute {
   readonly extensionId: string;
   readonly skillId: string;
   readonly bindingId: string;
+}
+
+function createProviderToolName(
+  extensionId: string,
+  skillId: string,
+  bindingId: string
+): string {
+  // Use a short portable name for providers with strict function-name rules.
+  const route = [extensionId, skillId, bindingId].join("::");
+  const digest = createHash("sha256").update(route, "utf8").digest("hex").slice(0, 24);
+  return `samp_${digest}`;
+}
+
+function clampInteger(
+  value: number | undefined,
+  fallback: number,
+  minimum: number,
+  maximum: number
+): number {
+  if (value === undefined || !Number.isFinite(value)) return fallback;
+  return Math.min(maximum, Math.max(minimum, Math.trunc(value)));
 }
 
 export class AgentRunner {
@@ -39,25 +61,38 @@ export class AgentRunner {
     if (!request.principal.subject.trim() || !request.serverInstanceId.trim()) {
       throw new SampAiError("Authenticated principal and server scope are required.", "TRUSTED_IDENTITY_REQUIRED");
     }
-    if (!request.sessionId.trim() || !request.userMessage.trim()) {
-      throw new SampAiError("Session ID and user message are required.", "INVALID_AGENT_REQUEST");
+    if (
+      !request.sessionId.trim() ||
+      request.sessionId.length > 128 ||
+      !request.userMessage.trim() ||
+      request.userMessage.length > 20_000
+    ) {
+      throw new SampAiError(
+        "Session ID must be 1-128 characters and user messages must be 1-20000 characters.",
+        "INVALID_AGENT_REQUEST"
+      );
     }
 
-    const maxSteps = Math.min(Math.max(request.maxSteps ?? DEFAULT_MAX_STEPS, 1), HARD_MAX_STEPS);
-    const maxToolCalls = Math.min(
-      Math.max(request.maxToolCalls ?? DEFAULT_MAX_TOOL_CALLS, 1),
+    const maxSteps = clampInteger(request.maxSteps, DEFAULT_MAX_STEPS, 1, HARD_MAX_STEPS);
+    const maxToolCalls = clampInteger(
+      request.maxToolCalls,
+      DEFAULT_MAX_TOOL_CALLS,
+      1,
       HARD_MAX_TOOL_CALLS
     );
-    const timeoutMs = Math.min(
-      Math.max(request.timeoutMs ?? DEFAULT_TIMEOUT_MS, 1000),
+    const timeoutMs = clampInteger(
+      request.timeoutMs,
+      DEFAULT_TIMEOUT_MS,
+      1000,
       HARD_MAX_TIMEOUT_MS
     );
 
-    const conversationKey = [
+    // JSON tuple avoids key collisions if identifiers contain separators.
+    const conversationKey = JSON.stringify([
       request.serverInstanceId,
       request.principal.subject,
       request.sessionId
-    ].join("::");
+    ]);
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -76,7 +111,13 @@ export class AgentRunner {
 
     request.signal?.addEventListener("abort", relayAbort, { once: true });
 
-    let messages: AgentMessage[] = [...await this.conversations.load(conversationKey)];
+    let messages: AgentMessage[] = [...await this.conversations.load(conversationKey)].slice(-40);
+    // Bound retained history to keep model context size predictable.
+    let historyChars = messages.reduce((sum, message) => sum + message.content.length, 0);
+    while (messages.length > 0 && historyChars > 60_000) {
+      const removed = messages.shift();
+      historyChars -= removed?.content.length ?? 0;
+    }
     const pendingMessages: AgentMessage[] = [];
     const userMessage: AgentMessage = {
       role: "user",
@@ -133,7 +174,11 @@ export class AgentRunner {
       );
 
       for (const binding of availableBindings) {
-        const name = `${enabled.extensionId}::${enabled.skill.id}::${binding.id}`;
+        const name = createProviderToolName(
+          enabled.extensionId,
+          enabled.skill.id,
+          binding.id
+        );
         routes.set(name, {
           extensionId: enabled.extensionId,
           skillId: enabled.skill.id,
@@ -141,7 +186,7 @@ export class AgentRunner {
         });
         providerTools.push({
           name,
-          description: binding.description,
+          description: `${binding.description} (skill: ${enabled.skill.id}; binding: ${binding.id})`,
           inputSchema: binding.inputSchema
         });
       }
@@ -180,17 +225,24 @@ export class AgentRunner {
           signal: controller.signal
         });
 
-        const calls = providerResponse.toolCalls ?? [];
+        const requestedCalls = providerResponse.toolCalls ?? [];
+        const remainingToolCalls = Math.max(0, maxToolCalls - toolCalls);
+        const calls = requestedCalls.slice(0, remainingToolCalls);
+        const providerText = (providerResponse.content ?? "").slice(0, 20_000);
         const assistantMessage: AgentMessage = {
           role: "assistant",
-          content: providerResponse.content ?? "",
+          content: providerText,
           ...(calls.length > 0 ? { toolCalls: calls } : {})
         };
         messages.push(assistantMessage);
         pendingMessages.push(assistantMessage);
-        response = providerResponse.content ?? "";
+        response = providerText;
 
-        if (calls.length === 0) {
+        if (requestedCalls.length > calls.length) {
+          stoppedBecause = "max_tool_calls";
+        }
+
+        if (calls.length === 0 && requestedCalls.length === 0) {
           completed = true;
           stoppedBecause = "completed";
           break;
@@ -326,11 +378,26 @@ export class AgentRunner {
         context
       );
 
+      const serialized = JSON.stringify({ ok: true, result });
+      if (serialized.length > 20_000) {
+        return {
+          role: "tool",
+          toolCallId: call.id,
+          name: call.name,
+          content: JSON.stringify({
+            error: {
+              code: "TOOL_OUTPUT_TOO_LARGE",
+              message: "Tool output exceeded the agent context limit."
+            }
+          })
+        };
+      }
+
       return {
         role: "tool",
         toolCallId: call.id,
         name: call.name,
-        content: JSON.stringify({ ok: true, result })
+        content: serialized
       };
     } catch (error) {
       const code =
