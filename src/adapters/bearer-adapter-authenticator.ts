@@ -17,8 +17,8 @@ export class InMemoryBearerAdapterAuthenticator {
     token: string,
     identity: AuthenticatedAdapterIdentity
   ): void {
-    if (token.length < 32) {
-      throw new Error("Adapter bearer tokens must contain at least 32 characters.");
+    if (token.length < 32 || token.length > 512) {
+      throw new Error("Adapter bearer tokens must contain between 32 and 512 characters.");
     }
 
     if (!identity.adapterId.trim() || !identity.serverInstanceId.trim()) {
