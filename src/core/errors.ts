@@ -48,3 +48,12 @@ export class ExtensionLoadError extends SampAiError {
     super(message, code);
   }
 }
+
+export class AuditPersistenceError extends SampAiError {
+  constructor(toolId: string) {
+    super(
+      `Tool may have completed, but its success audit could not be persisted: ${toolId}. Check operation state before retrying.`,
+      "AUDIT_PERSISTENCE_FAILED"
+    );
+  }
+}
