@@ -26,6 +26,7 @@ import {
   type ApprovalReceipt,
   AdapterActionRegistry,
   AdapterTaskQueue,
+  type AdapterActionDefinition,
   InMemoryBearerAdapterAuthenticator
 } from "../src/index.js";
 
