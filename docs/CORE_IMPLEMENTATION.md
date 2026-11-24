@@ -105,7 +105,7 @@ The included in-memory conversation store is for tests and local development onl
 ## Important boundaries
 
 - The registry is in-memory; persistent tool/extension storage is not implemented.
-- The loader validates candidates but does not install or activate them. The in-memory skill registry provides an initial review/enable lifecycle with injected verifiers; production persistence and cryptographic review/owner tokens are still required.
+- The loader validates candidates and computes a SHA-256 hash from the manifest and referenced instruction files, but does not install or activate them. The in-memory skill registry provides an initial review/enable lifecycle with injected verifiers; production persistence and cryptographic review/owner tokens are still required.
 - The permission engine requires a trusted `ApprovalVerifier`; this repository does not yet contain a production signature/identity service.
 - The `ExecutionContext` must be created by trusted backend authentication and policy code. Never construct it from model output or an untrusted game-client request.
 - Tool handlers must honor their `AbortSignal`. A timeout stops awaiting the result but cannot forcibly stop JavaScript code that ignores cancellation.
