@@ -42,6 +42,8 @@ Runs beside or inside the server integration. It advertises supported operations
 ### Extension manager
 Installs and manages community skills, tools, adapters, providers, catalogs, and UI extensions. Extensions declare dependencies, compatibility, permissions, and data access. Installation alone must not grant runtime permissions.
 
+The first extension format is declarative: skills compose existing registered tools. AI-generated candidates are validated and tested against mock tools, but remain disabled until maintainer review and server-owner activation. New executable tool implementations require a reviewed core/adapter contribution. See [Self-Expanding Skills](SELF_EXPANDING_SKILLS.md).
+
 ### Dashboard / in-game UI
 Provides chat, project browser, coordinate tools, previews, review queues, and audit history. An in-game command interface may be a small adapter-facing UI, not the only user interface.
 
