@@ -9,7 +9,6 @@ import {
   PermissionEngine,
   ToolExecutor,
   ToolRegistry,
-  type ApprovalReceipt,
   type ToolDefinition,
   ExtensionLoader,
   createDefaultSchemaValidator,
@@ -25,6 +24,8 @@ import {
   OpenAIResponsesProvider,
   HttpAdapterGateway,
   type ApprovalReceipt,
+  AdapterActionRegistry,
+  AdapterTaskQueue,
   InMemoryBearerAdapterAuthenticator
 } from "../src/index.js";
 
@@ -1745,4 +1746,358 @@ test("agent runner forwards backend-provided approval receipt and draft hash to 
   assert.equal(result.stoppedBecause, "completed");
   assert.equal(capturedOptions?.draftHash, approval.draftHash);
   assert.equal(capturedOptions?.approval?.approvalId, approval.approvalId);
+});
+
+
+function createTaskQueueHarness(options: ConstructorParameters<typeof AdapterTaskQueue>[3] = {}) {
+  const adapters = new AdapterRegistry(
+    new ProtocolValidator(createDefaultSchemaValidator())
+  );
+
+  adapters.registerHello({
+    protocol: "sampai/0.1",
+    message_id: "hello_task_queue",
+    type: "event",
+    server_instance_id: "task-server",
+    timestamp: "2026-11-24T15:00:00Z",
+    event: "adapter.hello",
+    payload: {
+      adapter: { name: "sampai-pawn", version: "0.1.0", runtime: "open.mp" },
+      capabilities: ["mapping.create_object"],
+      limits: { max_operations_per_batch: 20, max_objects_per_project: 1000 }
+    }
+  }, {
+    adapterId: "sampai-pawn",
+    serverInstanceId: "task-server"
+  });
+
+  const actions = new AdapterActionRegistry();
+  const objectAction: AdapterActionDefinition = {
+    id: "mapping.object.create",
+    description: "Create one mapped object in the server world.",
+    requiredCapabilities: ["mapping.create_object"],
+    effect: "mutate",
+    risk: "low",
+    idempotent: true,
+    compensation: "undo",
+    payloadSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        model_id: { type: "integer", minimum: 1 },
+        x: { type: "number" },
+        y: { type: "number" },
+        z: { type: "number" }
+      },
+      required: ["model_id", "x", "y", "z"]
+    },
+    resultSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        object_id: { type: "string", minLength: 1 }
+      },
+      required: ["object_id"]
+    }
+  };
+  actions.register(objectAction);
+
+  const queue = new AdapterTaskQueue(
+    adapters,
+    actions,
+    new JsonSchemaValidator(),
+    options
+  );
+
+  return { adapters, actions, queue, objectAction };
+}
+
+test("adapter task queue validates actions, enforces idempotency, leases, and results", () => {
+  const { queue } = createTaskQueueHarness();
+  const input = {
+    serverInstanceId: "task-server",
+    adapterId: "sampai-pawn",
+    actionId: "mapping.object.create",
+    payload: { model_id: 19377, x: 10, y: 20, z: 3 },
+    idempotencyKey: "hospital-wall-0001"
+  };
+
+  const first = queue.enqueue(input);
+  const duplicate = queue.enqueue(input);
+  assert.equal(first.taskId, duplicate.taskId);
+  assert.equal(first.state, "queued");
+
+  assert.throws(
+    () => queue.enqueue({
+      ...input,
+      payload: { model_id: 19377, x: 11, y: 20, z: 3 }
+    }),
+    (error: unknown) =>
+      error instanceof Error &&
+      "code" in error &&
+      error.code === "IDEMPOTENCY_CONFLICT"
+  );
+
+  assert.throws(
+    () => queue.enqueue({
+      ...input,
+      idempotencyKey: "hospital-invalid",
+      payload: { model_id: 19377, x: "wrong", y: 20, z: 3 }
+    }),
+    /Invalid payload/
+  );
+
+  const lease = queue.claimNext("task-server", "sampai-pawn");
+  assert.ok(lease);
+  assert.equal(lease.state, "leased");
+  assert.equal(lease.attempts, 1);
+
+  assert.throws(
+    () => queue.complete(
+      "task-server",
+      "sampai-pawn",
+      lease.taskId,
+      "wrong-lease-token",
+      { status: "succeeded", output: { object_id: "obj-01" } }
+    ),
+    (error: unknown) =>
+      error instanceof Error &&
+      "code" in error &&
+      error.code === "TASK_LEASE_INVALID"
+  );
+
+  const completed = queue.complete(
+    "task-server",
+    "sampai-pawn",
+    lease.taskId,
+    lease.leaseToken,
+    { status: "succeeded", output: { object_id: "obj-01" } }
+  );
+  assert.equal(completed.state, "succeeded");
+
+  assert.throws(
+    () => queue.complete(
+      "task-server",
+      "sampai-pawn",
+      lease.taskId,
+      lease.leaseToken,
+      { status: "succeeded", output: { object_id: "obj-02" } }
+    ),
+    (error: unknown) =>
+      error instanceof Error &&
+      "code" in error &&
+      error.code === "TASK_LEASE_INVALID"
+  );
+});
+
+test("adapter task queue retries only idempotent actions after lease expiry", () => {
+  const harness = createTaskQueueHarness({ leaseMs: 1000, defaultTtlMs: 10_000 });
+  const task = harness.queue.enqueue({
+    serverInstanceId: "task-server",
+    adapterId: "sampai-pawn",
+    actionId: "mapping.object.create",
+    payload: { model_id: 19377, x: 10, y: 20, z: 3 },
+    idempotencyKey: "retry-idempotent-01",
+    maxAttempts: 2
+  });
+
+  const firstLease = harness.queue.claimNext("task-server", "sampai-pawn");
+  assert.ok(firstLease);
+
+  const oldDateNow = Date.now;
+  try {
+    Date.now = () => oldDateNow() + 1500;
+    const requeued = harness.queue.getTask(task.taskId, "task-server");
+    assert.equal(requeued.state, "queued");
+    assert.throws(
+      () => harness.queue.complete(
+        "task-server",
+        "sampai-pawn",
+        task.taskId,
+        firstLease.leaseToken,
+        { status: "succeeded", output: { object_id: "obj-old" } }
+      ),
+      /lease is missing, expired/
+    );
+  } finally {
+    Date.now = oldDateNow;
+  }
+
+  const secondLease = harness.queue.claimNext("task-server", "sampai-pawn");
+  assert.ok(secondLease);
+  assert.equal(secondLease.attempts, 2);
+});
+
+test("adapter task queue does not blindly retry a non-idempotent action", () => {
+  const harness = createTaskQueueHarness({ leaseMs: 1000, defaultTtlMs: 10_000 });
+  harness.actions.register({
+    ...harness.objectAction,
+    id: "mapping.native.remove",
+    description: "Remove a native GTA building for a player.",
+    idempotent: false,
+    requiredCapabilities: ["mapping.create_object", "world.default_objects.remove_per_player"]
+  });
+
+  // Advertise the second capability using a fresh adapter hello.
+  harness.adapters.registerHello({
+    protocol: "sampai/0.1",
+    message_id: "hello_task_native",
+    type: "event",
+    server_instance_id: "task-server",
+    timestamp: "2026-11-24T15:00:00Z",
+    event: "adapter.hello",
+    payload: {
+      adapter: { name: "sampai-pawn", version: "0.1.0", runtime: "open.mp" },
+      capabilities: ["mapping.create_object", "world.default_objects.remove_per_player"],
+      limits: { max_operations_per_batch: 20, max_objects_per_project: 1000 }
+    }
+  }, {
+    adapterId: "sampai-pawn",
+    serverInstanceId: "task-server"
+  });
+
+  const task = harness.queue.enqueue({
+    serverInstanceId: "task-server",
+    adapterId: "sampai-pawn",
+    actionId: "mapping.native.remove",
+    payload: { model_id: 19377, x: 10, y: 20, z: 3 },
+    idempotencyKey: "native-removal-0001"
+  });
+  const lease = harness.queue.claimNext("task-server", "sampai-pawn");
+  assert.ok(lease);
+
+  const oldDateNow = Date.now;
+  try {
+    Date.now = () => oldDateNow() + 1500;
+    const failed = harness.queue.getTask(task.taskId, "task-server");
+    assert.equal(failed.state, "failed");
+    assert.equal(failed.result?.error?.code, "TASK_OUTCOME_UNKNOWN");
+  } finally {
+    Date.now = oldDateNow;
+  }
+
+  assert.equal(harness.queue.claimNext("task-server", "sampai-pawn"), undefined);
+});
+
+test("HTTP adapter gateway delivers tasks and accepts leased task results", async () => {
+  const adapters = new AdapterRegistry(
+    new ProtocolValidator(createDefaultSchemaValidator())
+  );
+  const actions = new AdapterActionRegistry();
+  actions.register({
+    id: "mapping.object.create",
+    description: "Create one mapped object.",
+    requiredCapabilities: ["mapping.create_object"],
+    effect: "mutate",
+    risk: "low",
+    idempotent: true,
+    compensation: "undo",
+    payloadSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        model_id: { type: "integer" },
+        x: { type: "number" },
+        y: { type: "number" },
+        z: { type: "number" }
+      },
+      required: ["model_id", "x", "y", "z"]
+    },
+    resultSchema: {
+      type: "object",
+      additionalProperties: false,
+      properties: { object_id: { type: "string" } },
+      required: ["object_id"]
+    }
+  });
+  const queue = new AdapterTaskQueue(adapters, actions, new JsonSchemaValidator());
+  const authenticator = new InMemoryBearerAdapterAuthenticator();
+  const token = "adapter-task-token-12345678901234567890";
+  authenticator.addCredential(token, {
+    adapterId: "sampai-pawn",
+    serverInstanceId: "task-http-server"
+  });
+
+  const gateway = new HttpAdapterGateway(adapters, authenticator, {}, queue);
+  const address = await gateway.listen(0, "127.0.0.1");
+  const baseUrl = "http://" + address.host + ":" + address.port;
+  const headers = {
+    "Authorization": "Bearer " + token,
+    "Content-Type": "application/json"
+  };
+
+  try {
+    const hello = await fetch(baseUrl + "/v1/adapters/hello", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        protocol: "sampai/0.1",
+        message_id: "hello_task_http",
+        type: "event",
+        server_instance_id: "task-http-server",
+        timestamp: "2026-11-24T15:00:00Z",
+        event: "adapter.hello",
+        payload: {
+          adapter: { name: "sampai-pawn", version: "0.1.0", runtime: "open.mp" },
+          capabilities: ["mapping.create_object"],
+          limits: { max_operations_per_batch: 20, max_objects_per_project: 1000 }
+        }
+      })
+    });
+    assert.equal(hello.status, 201);
+
+    const queued = queue.enqueue({
+      serverInstanceId: "task-http-server",
+      adapterId: "sampai-pawn",
+      actionId: "mapping.object.create",
+      payload: { model_id: 19377, x: 10, y: 20, z: 3 },
+      idempotencyKey: "http-task-00001"
+    });
+
+    const next = await fetch(baseUrl + "/v1/adapters/tasks/next", {
+      headers: { "Authorization": "Bearer " + token }
+    });
+    assert.equal(next.status, 200);
+    const nextBody = await next.json() as {
+      task: { taskId: string; leaseToken: string; state: string };
+    };
+    assert.equal(nextBody.task.taskId, queued.taskId);
+    assert.equal(nextBody.task.state, "leased");
+
+    const renewed = await fetch(
+      baseUrl + "/v1/adapters/tasks/" + queued.taskId + "/renew",
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ lease_token: nextBody.task.leaseToken })
+      }
+    );
+    assert.equal(renewed.status, 200);
+    const renewedBody = await renewed.json() as {
+      task: { leaseToken: string };
+    };
+
+    const result = await fetch(
+      baseUrl + "/v1/adapters/tasks/" + queued.taskId + "/result",
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          lease_token: renewedBody.task.leaseToken,
+          result: {
+            status: "succeeded",
+            output: { object_id: "created-object-01" }
+          }
+        })
+      }
+    );
+    assert.equal(result.status, 200);
+    const resultBody = await result.json() as {
+      task: { state: string; result: { status: string } };
+    };
+    assert.equal(resultBody.task.state, "succeeded");
+    assert.equal(resultBody.task.result.status, "succeeded");
+  } finally {
+    await gateway.close();
+  }
 });
