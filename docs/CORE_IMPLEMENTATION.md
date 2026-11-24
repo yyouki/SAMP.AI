@@ -29,7 +29,9 @@ npm run build
 | `src/validation/json-schema-validator.ts` | Ajv-based JSON Schema validation |
 | `src/validation/create-default-schema-validator.ts` | Registers extension and protocol schemas |
 | `src/protocol/protocol-validator.ts` | Validates message envelopes, adapter handshakes, and coordinates |
-| `src/protocol/http-adapter-gateway.ts` | Registration, heartbeat, adapter inspection, and disconnect HTTP routes |
+| `src/protocol/http-adapter-gateway.ts` | Registration, heartbeat, task claim/renew/result, adapter inspection, and disconnect routes |
+| `src/adapters/adapter-action-registry.ts` | Allowlist and schemas for typed server-side actions |
+| `src/adapters/adapter-task-queue.ts` | In-memory idempotent task queue with leases and retry policy |
 | `src/adapters/bearer-adapter-authenticator.ts` | Development-only hashed bearer credential authenticator |
 | `src/adapters/adapter-registry.ts` | Stores authenticated adapter identities, advertised capabilities, and heartbeat expiry |
 | `src/core/tool-registry.ts` | Tool and implementation registry |
@@ -48,7 +50,7 @@ npm run build
 
 ## HTTP adapter gateway
 
-The first gateway exposes `GET /health`, `POST /v1/adapters/hello`, `POST /v1/adapters/heartbeat`, `GET /v1/adapters/me`, and `DELETE /v1/adapters/me`. It binds each authenticated bearer credential to one adapter/server identity and applies a request body limit. The default bind address is loopback.
+The gateway exposes `GET /health`, adapter registration/liveness routes, and authenticated task claim/renew/result routes. Tasks come only from the typed internal action registry and in-memory queue. It binds each authenticated bearer credential to one adapter/server identity and applies a request body limit. The default bind address is loopback.
 
 See [HTTP Adapter Gateway](ADAPTER_GATEWAY.md) for the route contract and production deployment warnings.
 
