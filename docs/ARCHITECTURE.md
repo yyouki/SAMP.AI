@@ -58,6 +58,7 @@ The initial source scaffold provides:
 - a timed tool executor with optional audit events;
 - a declarative extension candidate loader with path containment checks;
 - protocol validators for adapter handshakes, message envelopes, and coordinate provenance;
+- an adapter registry that binds capability snapshots to authenticated adapter identities;
 - a deterministic mock mapping-inspection tool and unit tests.
 
 The extension loader returns a **disabled candidate**. It does not install or activate extensions. The approval verifier is an injected interface; a production cryptographic approval service and persistent identity store are still required.
@@ -133,7 +134,7 @@ At connection time, an adapter reports:
 - batch limits and rate limits;
 - context available (player state, camera direction, interior, virtual world, object inspection).
 
-The AI must degrade gracefully. If an exact raycast is unavailable, it should request a selected point or label its calculated point as an estimate. The same principle applies to every domain: discover capabilities, explain unavailable operations, and never claim access the adapter does not provide.
+The adapter registry must be fed only by a trusted transport-authentication layer; a client-provided server ID is not proof of server identity. On reconnect, the latest handshake replaces the prior capability snapshot for that adapter. The AI must degrade gracefully. If an exact raycast is unavailable, it should request a selected point or label its calculated point as an estimate. The same principle applies to every domain: discover capabilities, explain unavailable operations, and never claim access the adapter does not provide.
 
 ## 8. Reliability
 
