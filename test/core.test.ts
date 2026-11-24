@@ -1520,3 +1520,91 @@ test("bearer authenticator revokes a credential without exposing the token", asy
   assert.equal(authenticator.revokeCredential(token), true);
   assert.equal(await authenticator.authenticate("Bearer " + token), undefined);
 });
+
+
+test("adapter registry expires stale adapters and prunes expired records", () => {
+  const registry = new AdapterRegistry(
+    new ProtocolValidator(createDefaultSchemaValidator()),
+    ["sampai/0.1"],
+    1000
+  );
+
+  const hello = {
+    protocol: "sampai/0.1",
+    message_id: "hello_expiry_001",
+    type: "event",
+    server_instance_id: "expiry-server",
+    timestamp: "2026-11-24T15:00:00Z",
+    event: "adapter.hello",
+    payload: {
+      adapter: { name: "sampai-pawn", version: "0.1.0", runtime: "open.mp" },
+      capabilities: ["mapping.inspect"],
+      limits: { max_operations_per_batch: 20, max_objects_per_project: 1000 }
+    }
+  };
+
+  registry.registerHello(hello, {
+    adapterId: "sampai-pawn",
+    serverInstanceId: "expiry-server"
+  });
+
+  const oldDateNow = Date.now;
+  try {
+    Date.now = () => oldDateNow() + 2000;
+    assert.throws(
+      () => registry.getServerCapabilities("expiry-server"),
+      /No active authenticated adapter/
+    );
+    assert.equal(registry.list("expiry-server").length, 0);
+    assert.equal(registry.list("expiry-server", true).length, 1);
+    assert.equal(registry.pruneStale(), 1);
+  } finally {
+    Date.now = oldDateNow;
+  }
+
+  assert.equal(registry.list("expiry-server", true).length, 0);
+});
+
+test("HTTP adapter gateway supports an authenticated disconnect endpoint", async () => {
+  const registry = new AdapterRegistry(
+    new ProtocolValidator(createDefaultSchemaValidator())
+  );
+  const authenticator = new InMemoryBearerAdapterAuthenticator();
+  const token = "adapter-test-token-12345678901234567890";
+  authenticator.addCredential(token, {
+    adapterId: "sampai-pawn",
+    serverInstanceId: "disconnect-server"
+  });
+
+  const gateway = new HttpAdapterGateway(registry, authenticator);
+  const address = await gateway.listen(0, "127.0.0.1");
+  const baseUrl = "http://" + address.host + ":" + address.port;
+
+  try {
+    registry.registerHello({
+      protocol: "sampai/0.1",
+      message_id: "hello_disconnect_001",
+      type: "event",
+      server_instance_id: "disconnect-server",
+      timestamp: "2026-11-24T15:00:00Z",
+      event: "adapter.hello",
+      payload: {
+        adapter: { name: "sampai-pawn", version: "0.1.0", runtime: "open.mp" },
+        capabilities: ["mapping.inspect"],
+        limits: { max_operations_per_batch: 20, max_objects_per_project: 1000 }
+      }
+    }, {
+      adapterId: "sampai-pawn",
+      serverInstanceId: "disconnect-server"
+    });
+
+    const disconnected = await fetch(baseUrl + "/v1/adapters/me", {
+      method: "DELETE",
+      headers: { "Authorization": "Bearer " + token }
+    });
+    assert.equal(disconnected.status, 200);
+    assert.equal(registry.list("disconnect-server").length, 0);
+  } finally {
+    await gateway.close();
+  }
+});
