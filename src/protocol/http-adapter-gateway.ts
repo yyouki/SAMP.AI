@@ -9,6 +9,10 @@ import {
   AdapterRegistry,
   type AuthenticatedAdapterIdentity
 } from "../adapters/adapter-registry.js";
+import {
+  AdapterTaskQueue,
+  type AdapterTaskResult
+} from "../adapters/adapter-task-queue.js";
 
 export interface AdapterAuthenticator {
   authenticate(
@@ -56,7 +60,10 @@ function parseTaskResult(value: unknown): AdapterTaskResult {
       typeof value.error.code !== "string" ||
       typeof value.error.message !== "string"
     ) {
-      throw new HttpRequestError("Failed task results require error.code and error.message.", 400);
+      throw new HttpRequestError(
+        "Failed task results require error.code and error.message.",
+        400
+      );
     }
 
     return {
@@ -143,6 +150,10 @@ export class HttpAdapterGateway {
   ): Promise<void> {
     const url = new URL(request.url ?? "/", "http://localhost");
     const path = url.pathname;
+    const taskRoute = /^\/v1\/adapters\/tasks\/([0-9a-f-]{36})\/(renew|result)$/i.exec(path);
+    const isTaskRoute =
+      path === "/v1/adapters/tasks/next" ||
+      taskRoute !== null;
 
     if (request.method === "GET" && path === "/health") {
       this.sendJson(response, 200, {
@@ -151,11 +162,6 @@ export class HttpAdapterGateway {
       });
       return;
     }
-
-    const taskRoute = /^\\/v1\\/adapters\\/tasks\\/([0-9a-f-]{36})\\/(renew|result)$/i.exec(path);
-    const isTaskRoute =
-      path === "/v1/adapters/tasks/next" ||
-      taskRoute !== null;
 
     if (
       path !== "/v1/adapters/hello" &&
@@ -255,7 +261,10 @@ export class HttpAdapterGateway {
 
       if (isTaskRoute && !this.tasks) {
         this.sendJson(response, 503, {
-          error: { code: "TASK_QUEUE_UNAVAILABLE", message: "Adapter task queue is not configured." }
+          error: {
+            code: "TASK_QUEUE_UNAVAILABLE",
+            message: "Adapter task queue is not configured."
+          }
         });
         return;
       }
@@ -278,16 +287,14 @@ export class HttpAdapterGateway {
           return;
         }
 
-        this.sendJson(response, 200, {
-          ok: true,
-          task
-        });
+        this.sendJson(response, 200, { ok: true, task });
         return;
       }
 
       if (taskRoute && request.method === "POST") {
         this.assertJsonContentType(request);
         const body = await this.readJsonBody(request);
+
         if (!isRecord(body) || typeof body.lease_token !== "string") {
           throw new HttpRequestError("Request requires a lease_token.", 400);
         }
@@ -316,10 +323,7 @@ export class HttpAdapterGateway {
           result
         );
 
-        this.sendJson(response, 200, {
-          ok: true,
-          task: completed
-        });
+        this.sendJson(response, 200, { ok: true, task: completed });
         return;
       }
 
@@ -352,7 +356,10 @@ export class HttpAdapterGateway {
       }
 
       this.sendJson(response, 500, {
-        error: { code: "INTERNAL_ERROR", message: "The adapter gateway could not process the request." }
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "The adapter gateway could not process the request."
+        }
       });
     }
   }
