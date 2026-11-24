@@ -1,4 +1,5 @@
 import { readFile, realpath, stat } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { ExtensionLoadError } from "../core/errors.js";
@@ -91,6 +92,8 @@ export interface LoadedToolBinding {
 export interface ExtensionCandidate {
   readonly status: "candidate";
   readonly rootDirectory: string;
+  /** SHA-256 hash computed by the loader from the manifest and referenced skill files. */
+  readonly packageHash: string;
   readonly manifest: ExtensionManifest;
   readonly skills: readonly LoadedSkill[];
   readonly toolBindings: readonly LoadedToolBinding[];
@@ -138,13 +141,17 @@ export class ExtensionLoader {
     this.assertPermissionAndCapabilityDeclarations(manifest);
     this.assertToolBindings(manifest);
 
-    // The entrypoint is checked even though skills are loaded individually.
-    await this.readPackageFile(root, manifest.entrypoint.file);
+    // Hash only files the declarative loader actually consumes.
+    const packageFiles = new Map<string, string>([["extension.json", manifestText]]);
+
+    const entrypointContent = await this.readPackageFile(root, manifest.entrypoint.file);
+    packageFiles.set(manifest.entrypoint.file, entrypointContent);
 
     const skills: LoadedSkill[] = [];
 
     for (const skill of manifest.skills) {
       const instruction = await this.readPackageFile(root, skill.instruction_file);
+      packageFiles.set(skill.instruction_file, instruction);
 
       skills.push({
         id: skill.id,
@@ -157,18 +164,34 @@ export class ExtensionLoader {
       });
     }
 
+    const packageDigest = createHash("sha256");
+    for (const [filePath, contents] of [...packageFiles.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+      packageDigest.update(filePath, "utf8");
+      packageDigest.update("\\0", "utf8");
+      packageDigest.update(contents, "utf8");
+      packageDigest.update("\\0", "utf8");
+    }
+    const packageHash = `sha256:${packageDigest.digest("hex")}`;
+
     const immutableManifest = deepFreeze(structuredClone(manifest));
     const immutableSkills = deepFreeze(skills);
     const immutableBindings = deepFreeze(
       manifest.tools.map((binding) => ({
         id: binding.id,
-        implementationId: binding.implementation
+        implementationId: binding.implementation,
+        description: binding.description,
+        inputSchema: structuredClone(binding.input_schema),
+        effect: binding.effect,
+        risk: binding.risk,
+        requiredPermissions: [...binding.required_permissions],
+        requiredCapabilities: [...binding.required_capabilities]
       }))
     );
 
     return Object.freeze({
       status: "candidate" as const,
       rootDirectory: root,
+      packageHash,
       manifest: immutableManifest,
       skills: immutableSkills,
       toolBindings: immutableBindings
