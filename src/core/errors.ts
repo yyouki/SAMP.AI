@@ -57,3 +57,12 @@ export class AuditPersistenceError extends SampAiError {
     );
   }
 }
+
+export class AuditRequiredError extends SampAiError {
+  constructor(toolId: string) {
+    super(
+      `An audit sink is required before non-read tool execution: ${toolId}`,
+      "AUDIT_REQUIRED"
+    );
+  }
+}
