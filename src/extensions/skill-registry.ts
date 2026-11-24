@@ -61,17 +61,15 @@ export class SkillRegistry {
     private readonly enablementVerifier: ExtensionEnablementVerifier
   ) {}
 
-  registerCandidate(
-    candidate: ExtensionCandidate,
-    packageHash: string
-  ): void {
-    if (!/^(sha256:)?[a-f0-9]{64}$/i.test(packageHash)) {
+  registerCandidate(candidate: ExtensionCandidate): void {
+    if (!/^sha256:[a-f0-9]{64}$/i.test(candidate.packageHash)) {
       throw new SampAiError(
-        "Extension package hash must be a SHA-256 hex digest.",
+        "Extension candidate does not contain a loader-computed SHA-256 package hash.",
         "PACKAGE_HASH_INVALID"
       );
     }
 
+    const packageHash = candidate.packageHash;
     const existing = this.extensions.get(candidate.manifest.id);
     if (existing) {
       if (existing.packageHash === packageHash) {
