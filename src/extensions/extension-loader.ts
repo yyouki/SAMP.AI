@@ -73,11 +73,15 @@ export interface LoadedSkill {
   readonly description: string;
   readonly instruction: string;
   readonly allowedTools: readonly string[];
+  readonly requiredPermissions: readonly string[];
+  readonly requiredCapabilities: readonly string[];
 }
 
 export interface LoadedToolBinding {
   readonly id: string;
   readonly implementationId: string;
+  readonly requiredPermissions: readonly string[];
+  readonly requiredCapabilities: readonly string[];
 }
 
 export interface ExtensionCandidate {
@@ -143,7 +147,9 @@ export class ExtensionLoader {
         name: skill.name,
         description: skill.description,
         instruction,
-        allowedTools: [...skill.allowed_tools]
+        allowedTools: [...skill.allowed_tools],
+        requiredPermissions: [...skill.required_permissions],
+        requiredCapabilities: [...skill.required_capabilities]
       });
     }
 
