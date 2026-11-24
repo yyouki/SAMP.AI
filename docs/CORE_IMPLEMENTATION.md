@@ -29,7 +29,9 @@ npm run build
 | `src/validation/json-schema-validator.ts` | Ajv-based JSON Schema validation |
 | `src/validation/create-default-schema-validator.ts` | Registers extension and protocol schemas |
 | `src/protocol/protocol-validator.ts` | Validates message envelopes, adapter handshakes, and coordinates |
-| `src/adapters/adapter-registry.ts` | Stores authenticated adapter identities and advertised capabilities |
+| `src/protocol/http-adapter-gateway.ts` | Registration, heartbeat, adapter inspection, and disconnect HTTP routes |
+| `src/adapters/bearer-adapter-authenticator.ts` | Development-only hashed bearer credential authenticator |
+| `src/adapters/adapter-registry.ts` | Stores authenticated adapter identities, advertised capabilities, and heartbeat expiry |
 | `src/core/tool-registry.ts` | Tool and implementation registry |
 | `src/security/permission-engine.ts` | Permission, capability, autonomy, and approval gates |
 | `src/security/execution-context-factory.ts` | Builds context from trusted principal, permissions, policy, and adapter capabilities |
@@ -43,6 +45,12 @@ npm run build
 | `src/providers/openai-responses-provider.ts` | Optional OpenAI Responses API provider adapter |
 | `src/adapters/mock/register-mock-tools.ts` | Deterministic mock mapping inspection tool |
 | `test/core.test.ts` | Initial core unit tests |
+
+## HTTP adapter gateway
+
+The first gateway exposes `GET /health`, `POST /v1/adapters/hello`, `POST /v1/adapters/heartbeat`, `GET /v1/adapters/me`, and `DELETE /v1/adapters/me`. It binds each authenticated bearer credential to one adapter/server identity and applies a request body limit. The default bind address is loopback.
+
+See [HTTP Adapter Gateway](ADAPTER_GATEWAY.md) for the route contract and production deployment warnings.
 
 ## Adapter registry
 
