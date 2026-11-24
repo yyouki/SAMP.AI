@@ -29,12 +29,19 @@ npm run build
 | `src/validation/json-schema-validator.ts` | Ajv-based JSON Schema validation |
 | `src/validation/create-default-schema-validator.ts` | Registers extension and protocol schemas |
 | `src/protocol/protocol-validator.ts` | Validates message envelopes, adapter handshakes, and coordinates |
+| `src/adapters/adapter-registry.ts` | Stores authenticated adapter identities and advertised capabilities |
 | `src/core/tool-registry.ts` | Tool and implementation registry |
 | `src/security/permission-engine.ts` | Permission, capability, autonomy, and approval gates |
 | `src/core/tool-executor.ts` | Validates and runs registered tools with timeout and audit hooks |
 | `src/extensions/extension-loader.ts` | Validates and loads declarative extension candidates |
 | `src/adapters/mock/register-mock-tools.ts` | Deterministic mock mapping inspection tool |
 | `test/core.test.ts` | Initial core unit tests |
+
+## Adapter registry
+
+The adapter registry accepts a validated hello only when the server instance and adapter name match identity supplied by trusted transport authentication. It replaces stale capabilities on reconnect and exposes the union of capabilities for a server instance.
+
+The registry does not implement credential authentication itself. A future HTTP/WebSocket gateway must authenticate the adapter first and pass the resulting trusted identity into `registerHello`.
 
 ## Protocol validation
 
