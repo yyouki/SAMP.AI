@@ -9,5 +9,7 @@ export * from "./protocol/protocol-validator.js";
 export * from "./adapters/adapter-registry.js";
 export * from "./adapters/mock/register-mock-tools.js";
 export * from "./extensions/extension-loader.js";
+export * from "./extensions/skill-registry.js";
+export * from "./extensions/skill-tool-dispatcher.js";
 export type { LoadedToolBinding } from "./extensions/extension-loader.js";
 export * from "./shared/contracts.js";
