@@ -80,6 +80,10 @@ export interface LoadedSkill {
 export interface LoadedToolBinding {
   readonly id: string;
   readonly implementationId: string;
+  readonly description: string;
+  readonly inputSchema: JsonSchema;
+  readonly effect: ToolEffect;
+  readonly risk: RiskLevel;
   readonly requiredPermissions: readonly string[];
   readonly requiredCapabilities: readonly string[];
 }
