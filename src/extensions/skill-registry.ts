@@ -211,10 +211,9 @@ export class SkillRegistry {
       );
     }
 
-    const missingGrants = record.candidate.manifest.skills
-      .find((entry) => entry.id === skillId)!
-      .required_permissions
-      .filter((permission) => !activation.grantedPermissions.includes(permission));
+    const missingGrants = skill.requiredPermissions.filter(
+      (permission) => !activation.grantedPermissions.includes(permission)
+    );
 
     if (missingGrants.length > 0) {
       throw new SampAiError(
