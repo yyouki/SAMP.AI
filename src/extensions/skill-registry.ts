@@ -232,6 +232,33 @@ export class SkillRegistry {
     });
   }
 
+  listEnabledSkills(serverInstanceId: string): readonly EnabledSkill[] {
+    const enabled: EnabledSkill[] = [];
+
+    for (const [extensionId, record] of this.extensions) {
+      const activation = record.enabledServers.get(serverInstanceId);
+      if (!activation) continue;
+
+      for (const skill of record.candidate.skills) {
+        const hasPermissions = skill.requiredPermissions.every(
+          (permission) => activation.grantedPermissions.includes(permission)
+        );
+        if (!hasPermissions) continue;
+
+        enabled.push(Object.freeze({
+          extensionId,
+          packageHash: record.packageHash,
+          serverInstanceId,
+          skill,
+          toolBindings: record.candidate.toolBindings,
+          grantedPermissions: activation.grantedPermissions
+        }));
+      }
+    }
+
+    return Object.freeze(enabled);
+  }
+
   getState(extensionId: string): {
     readonly packageHash: string;
     readonly reviewed: boolean;
