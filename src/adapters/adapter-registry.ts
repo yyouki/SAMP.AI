@@ -28,10 +28,14 @@ export interface RegisteredAdapter {
 export class AdapterRegistry {
   private readonly adapters = new Map<string, RegisteredAdapter>();
 
+  private readonly supportedProtocols: ReadonlySet<string>;
+
   constructor(
     private readonly protocol: ProtocolValidator,
-    private readonly supportedProtocols: readonly string[] = ["sampai/0.1"]
-  ) {}
+    supportedProtocols: readonly string[] = ["sampai/0.1"]
+  ) {
+    this.supportedProtocols = new Set(supportedProtocols);
+  }
 
   registerHello(
     input: unknown,
@@ -61,7 +65,7 @@ export class AdapterRegistry {
       );
     }
 
-    if (!this.supportedProtocols.includes(hello.protocol)) {
+    if (!this.supportedProtocols.has(hello.protocol)) {
       throw new SampAiError(
         `Unsupported adapter protocol version: ${hello.protocol}`,
         "PROTOCOL_VERSION_UNSUPPORTED"
