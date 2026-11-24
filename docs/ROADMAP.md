@@ -5,25 +5,30 @@ This roadmap prioritizes a safe, testable end-to-end path before adding more ada
 ## Phase 0 — Project foundation
 - [x] Create project overview and initial design documents.
 - [ ] Choose a license.
-- [ ] Decide initial implementation language/runtime for the standalone core.
+- [x] Select TypeScript on Node.js 22+ for the standalone core; keep server adapters language-independent.
 - [ ] Agree on protocol naming, versioning, and schema tooling.
 - [ ] Set up contribution guidelines, code of conduct, and security reporting.
 
 ## Phase 1 — Protocol and test harness
 - [ ] Define JSON Schemas for message envelopes, coordinates, capabilities, drafts, operations, approvals, execution results, and extension packages.
 - [x] Add initial extension manifest, skill, and tool-binding schemas.
-- [ ] Implement protocol validation.
+- [ ] Implement full protocol envelope and event validation.
+- [x] Add reusable JSON Schema validation for extension schemas.
 - [ ] Build a mock adapter that can simulate player state, anchors, markers, server objects, native-world removal directives, and failures.
 - [ ] Add contract tests so every adapter must pass the same protocol suite.
+- [x] Add initial registry, permission, execution, and declarative extension-loader tests.
 
 **Exit condition:** a mock server can connect, advertise capabilities, receive a validated draft, and return deterministic execution results.
 
 ## Phase 2 — Minimal AI Core
 - [ ] Implement provider interface and one provider.
 - [ ] Implement conversation/session management.
-- [ ] Implement structured tool calling with an allowlist.
-- [ ] Implement permission and approval checks.
-- [ ] Add logging, timeouts, cancellation, and usage budgets.
+- [x] Add an in-memory tool registry with capability metadata.
+- [x] Add permission, autonomy, and approval-verifier gates for tool execution.
+- [x] Add tool input/output validation, timeouts, and optional audit events.
+- [ ] Integrate a model provider and structured model tool-calling loop.
+- [ ] Implement signed approval receipts and persistent audit storage.
+- [ ] Add usage budgets and cancellation propagation across model calls.
 
 **Exit condition:** AI can discuss a request, ask clarifying questions, produce a structured plan, and cannot apply it without approval.
 
