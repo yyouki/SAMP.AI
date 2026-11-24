@@ -1,4 +1,4 @@
-import { AuditPersistenceError, AuditRequiredError, ToolTimeoutError } from "./errors.js";
+import { AuditPersistenceError, AuditRequiredError, ToolCancelledError, ToolTimeoutError } from "./errors.js";
 import type {
   AuditSink,
   ExecutionContext,
@@ -42,6 +42,10 @@ export class ToolExecutor {
     input: unknown,
     context: ExecutionContext
   ): Promise<TOutput> {
+    if (context.signal?.aborted) {
+      throw new ToolCancelledError(tool.id);
+    }
+
     // Authorization is checked before revealing schema details or invoking code.
     try {
       await this.permissions.assertAuthorized(tool, context);
@@ -79,6 +83,13 @@ export class ToolExecutor {
     });
 
     const controller = new AbortController();
+    const relayAbort = () => controller.abort();
+    if (context.signal?.aborted) {
+      controller.abort();
+    } else {
+      context.signal?.addEventListener("abort", relayAbort, { once: true });
+    }
+
     const timeout = setTimeout(() => controller.abort(), tool.timeoutMs);
     let output: unknown;
 
@@ -100,6 +111,7 @@ export class ToolExecutor {
       throw error;
     } finally {
       clearTimeout(timeout);
+      context.signal?.removeEventListener("abort", relayAbort);
     }
 
     // The operation may already have completed if persisting this final event fails.
@@ -113,7 +125,6 @@ export class ToolExecutor {
         timestamp: new Date().toISOString()
       });
     } catch {
-      // A side effect may already have completed; do not imply it is safe to retry blindly.
       throw new AuditPersistenceError(tool.id);
     }
 
@@ -126,10 +137,20 @@ export class ToolExecutor {
     context: ExecutionContext,
     controller: AbortController
   ): Promise<unknown> {
+    const abortError = () =>
+      context.signal?.aborted
+        ? new ToolCancelledError(tool.id)
+        : new ToolTimeoutError(tool.id, tool.timeoutMs);
+
     const timeoutPromise = new Promise<never>((_resolve, reject) => {
+      if (controller.signal.aborted) {
+        reject(abortError());
+        return;
+      }
+
       controller.signal.addEventListener(
         "abort",
-        () => reject(new ToolTimeoutError(tool.id, tool.timeoutMs)),
+        () => reject(abortError()),
         { once: true }
       );
     });
