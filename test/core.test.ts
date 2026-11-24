@@ -104,7 +104,10 @@ function createExecutor(verifyApproval = async () => true) {
 
   const schemas = new JsonSchemaValidator();
 
-  return new ToolExecutor(registry, permissionEngine, schemas);
+  // Tests use a deterministic in-memory audit sink for non-read tools.
+  return new ToolExecutor(registry, permissionEngine, schemas, {
+    write: async () => undefined
+  });
 }
 
 test("registry rejects duplicate tool IDs", () => {
@@ -806,7 +809,7 @@ test("execution context factory uses backend permissions and registered adapter 
     { subject: "admin-42" },
     "server-factory",
     "city-project",
-    { draftHash: "sha256:revision-001", approval }
+    { draftHash: approval.draftHash, approval }
   );
 
   assert.deepEqual(context.actor.permissions, ["mapping.view", "mapping.create"]);
@@ -847,5 +850,41 @@ test("execution context factory rejects an actor resolver identity mismatch", as
   await assert.rejects(
     factory.create({ subject: "admin-42" }, "server-factory"),
     /different from the authenticated principal/
+  );
+});
+
+
+test("non-read tool execution requires an audit sink", async () => {
+  const registry = new ToolRegistry();
+  registry.register({
+    ...createReadTool(),
+    id: "project.prepare-draft",
+    implementationId: "project.prepare-draft",
+    effect: "draft",
+    handler: async () => ({ projectId: "hospital", count: 0 })
+  });
+
+  const executor = new ToolExecutor(
+    registry,
+    new PermissionEngine({ verify: async () => true }),
+    new JsonSchemaValidator()
+  );
+
+  await assert.rejects(
+    executor.execute(
+      "project.prepare-draft",
+      { projectId: "hospital" },
+      {
+        actor: { id: "mapper-01", permissions: ["project.view"] },
+        serverInstanceId: "server-test",
+        projectId: "hospital",
+        adapterCapabilities: ["project.inspect"],
+        autonomy: "draft_only"
+      }
+    ),
+    (error: unknown) =>
+      error instanceof Error &&
+      "code" in error &&
+      error.code === "AUDIT_REQUIRED"
   );
 });
