@@ -18,7 +18,7 @@ This roadmap prioritizes a safe, testable end-to-end path before adding more ada
 - [x] Add reusable JSON Schema validation for extension schemas.
 - [x] Add an adapter registry that binds hello messages to authenticated identities, tracks capabilities, and expires stale registrations.
 - [x] Add an initial authenticated HTTP gateway for adapter hello, heartbeat, inspection, and disconnect.
-- [ ] Build a mock adapter that can simulate player state, anchors, markers, server objects, native-world removal directives, and failures.
+- [x] Add a typed adapter action registry and in-memory task queue with idempotency keys, leases, schema-validated results, and non-idempotent retry protection.\n- [ ] Build a mock adapter that can simulate player state, anchors, markers, server objects, native-world removal directives, and failures.
 - [x] Add an authenticated HTTP gateway for adapter registration and heartbeat lifecycle.
 - [ ] Add contract tests so every adapter must pass the same protocol suite.
 - [x] Add initial registry, permission, execution, and declarative extension-loader tests.
@@ -45,7 +45,7 @@ This roadmap prioritizes a safe, testable end-to-end path before adding more ada
 **Exit condition:** AI can discuss a request, ask clarifying questions, produce a structured plan, and cannot apply it without approval.
 
 ## Phase 3 — First open.mp adapter (Pawn)
-- [ ] Implement adapter task/action dispatch over the authenticated gateway.
+- [x] Add authenticated HTTP task claim, lease renewal, and result submission routes.\n- [ ] Implement durable task storage and worker-side task deduplication.\n- [ ] Implement adapter task/action dispatch over the authenticated gateway.
 - [ ] Connect a real Pawn adapter to the HTTP gateway.
 - [ ] Report server/runtime metadata and capabilities.
 - [ ] Capture player position and facing direction where available.
