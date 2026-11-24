@@ -1,4 +1,4 @@
-import { ToolTimeoutError } from "./errors.js";
+import { AuditPersistenceError, ToolTimeoutError } from "./errors.js";
 import type {
   AuditSink,
   ExecutionContext,
@@ -99,14 +99,19 @@ export class ToolExecutor {
     }
 
     // The operation may already have completed if persisting this final event fails.
-    await this.writeAudit({
-      event: "tool.succeeded",
-      toolId: tool.id,
-      actorId: context.actor.id,
-      serverInstanceId: context.serverInstanceId,
-      ...(context.projectId ? { projectId: context.projectId } : {}),
-      timestamp: new Date().toISOString()
-    });
+    try {
+      await this.writeAudit({
+        event: "tool.succeeded",
+        toolId: tool.id,
+        actorId: context.actor.id,
+        serverInstanceId: context.serverInstanceId,
+        ...(context.projectId ? { projectId: context.projectId } : {}),
+        timestamp: new Date().toISOString()
+      });
+    } catch {
+      // A side effect may already have completed; do not imply it is safe to retry blindly.
+      throw new AuditPersistenceError(tool.id);
+    }
 
     return output as TOutput;
   }
