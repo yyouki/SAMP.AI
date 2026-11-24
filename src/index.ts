@@ -4,6 +4,7 @@ export * from "./core/tool-executor.js";
 export * from "./security/permission-engine.js";
 export * from "./validation/json-schema-validator.js";
 export * from "./validation/create-default-schema-validator.js";
+export * from "./protocol/protocol-validator.js";
 export * from "./adapters/mock/register-mock-tools.js";
 export * from "./extensions/extension-loader.js";
 export type { LoadedToolBinding } from "./extensions/extension-loader.js";
