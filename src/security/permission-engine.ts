@@ -101,6 +101,19 @@ export class PermissionEngine {
           "AUTONOMY_RESTRICTED"
         );
       }
+
+      if (context.autonomy === "restricted_automation") {
+        const isAllowlisted =
+          context.autoAllowedToolIds?.includes(tool.id) === true;
+
+        if (!isAllowlisted || tool.risk !== "low") {
+          throw new AuthorizationError(
+            "Draft tool is not eligible for restricted automation.",
+            "AUTONOMY_RESTRICTED"
+          );
+        }
+      }
+
       return;
     }
 
