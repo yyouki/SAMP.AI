@@ -958,7 +958,8 @@ test("agent runner exposes only active skill tools and executes through the skil
       providerCalls += 1;
       if (providerCalls === 1) {
         assert.equal(request.tools.length, 1);
-        assert.ok(request.tools[0]?.name.includes("community.scene-auditor.inspect"));
+        assert.match(request.tools[0]?.name ?? "", /^samp_[a-f0-9]{24}$/);
+        assert.ok(request.tools[0]?.description.includes("community.scene-auditor.inspect"));
         return {
           content: "I will inspect the project.",
           toolCalls: [{
