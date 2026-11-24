@@ -363,6 +363,13 @@ export class ExtensionLoader {
       throw new ExtensionLoadError(`Extension path is not a file: ${relativePath}`);
     }
 
+    const maxBytes = relativePath.endsWith(".json") ? 512 * 1024 : 128 * 1024;
+    if (fileStat.size > maxBytes) {
+      throw new ExtensionLoadError(
+        `Extension file exceeds the ${maxBytes}-byte limit: ${relativePath}`
+      );
+    }
+
     return readFile(resolvedFile, "utf8");
   }
 }
