@@ -187,8 +187,16 @@ export class OpenAIResponsesProvider implements ModelProvider {
       throw new SampAiError("OpenAI base URL must be a valid URL.", "PROVIDER_CONFIGURATION_INVALID");
     }
 
-    if (parsedUrl.protocol !== "https:" && parsedUrl.protocol !== "http:") {
-      throw new SampAiError("OpenAI base URL must use HTTP or HTTPS.", "PROVIDER_CONFIGURATION_INVALID");
+    const isLoopback =
+      parsedUrl.hostname === "localhost" ||
+      parsedUrl.hostname === "127.0.0.1" ||
+      parsedUrl.hostname === "[::1]";
+
+    if (parsedUrl.protocol !== "https:" && !(parsedUrl.protocol === "http:" && isLoopback)) {
+      throw new SampAiError(
+        "OpenAI base URL must use HTTPS. Plain HTTP is allowed only for loopback development.",
+        "PROVIDER_CONFIGURATION_INVALID"
+      );
     }
 
     this.endpoint = baseUrl + "/responses";
