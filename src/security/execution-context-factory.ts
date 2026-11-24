@@ -36,6 +36,7 @@ export interface AutonomyPolicyResolver {
 export interface ExecutionContextOptions {
   readonly draftHash?: string;
   readonly approval?: ApprovalReceipt;
+  readonly signal?: AbortSignal;
 }
 
 /**
@@ -86,7 +87,8 @@ export class ExecutionContextFactory {
       autonomy: policy.mode,
       autoAllowedToolIds: Object.freeze([...policy.autoAllowedToolIds]),
       ...(options.draftHash ? { draftHash: options.draftHash } : {}),
-      ...(options.approval ? { approval: options.approval } : {})
+      ...(options.approval ? { approval: options.approval } : {}),
+      ...(options.signal ? { signal: options.signal } : {})
     });
   }
 }
