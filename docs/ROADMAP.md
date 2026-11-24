@@ -16,7 +16,8 @@ This roadmap prioritizes a safe, testable end-to-end path before adding more ada
 - [x] Add TypeScript protocol validator and valid/invalid message tests.
 - [x] Add CI workflow for source/test type-checking, unit tests, and TypeScript build.
 - [x] Add reusable JSON Schema validation for extension schemas.
-- [x] Add an adapter registry that binds hello messages to authenticated identities and tracks capabilities.
+- [x] Add an adapter registry that binds hello messages to authenticated identities, tracks capabilities, and expires stale registrations.
+- [x] Add an initial authenticated HTTP gateway for adapter hello, heartbeat, inspection, and disconnect.
 - [ ] Build a mock adapter that can simulate player state, anchors, markers, server objects, native-world removal directives, and failures.
 - [ ] Add contract tests so every adapter must pass the same protocol suite.
 - [x] Add initial registry, permission, execution, and declarative extension-loader tests.
@@ -43,7 +44,7 @@ This roadmap prioritizes a safe, testable end-to-end path before adding more ada
 **Exit condition:** AI can discuss a request, ask clarifying questions, produce a structured plan, and cannot apply it without approval.
 
 ## Phase 3 — First open.mp adapter (Pawn)
-- [ ] Connect adapter to the core.
+- [ ] Connect a real Pawn adapter to the HTTP gateway.
 - [ ] Report server/runtime metadata and capabilities.
 - [ ] Capture player position and facing direction where available.
 - [ ] Capture interior and virtual-world context where available.
