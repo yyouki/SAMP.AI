@@ -1047,15 +1047,19 @@ test("agent runner cannot call a tool absent from the current enabled skill set"
   const runner = new AgentRunner(
     {
       complete: async (request) => {
-        assert.equal(request.tools.length, 1);
-        return {
-          content: "I cannot run an unavailable tool.",
-          toolCalls: [{
-            id: "call-unknown",
-            name: "database.drop_all",
-            arguments: {}
-          }]
-        };
+        const callNumber = request.messages.filter((message) => message.role === "assistant").length;
+        if (callNumber === 0) {
+          assert.equal(request.tools.length, 1);
+          return {
+            content: "I cannot run an unavailable tool.",
+            toolCalls: [{
+              id: "call-unknown",
+              name: "database.drop_all",
+              arguments: {}
+            }]
+          };
+        }
+        return { content: "That tool is not available to this session." };
       }
     },
     new InMemoryAgentConversationStore(),
