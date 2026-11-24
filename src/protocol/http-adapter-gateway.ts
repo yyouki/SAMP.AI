@@ -191,6 +191,16 @@ export class HttpAdapterGateway {
         return;
       }
 
+      if (request.method === "DELETE" && path === "/v1/adapters/me") {
+        const removed = this.adapters.unregister(
+          identity.serverInstanceId,
+          identity.adapterId
+        );
+
+        this.sendJson(response, 200, { ok: true, removed });
+        return;
+      }
+
       this.sendJson(response, 405, {
         error: { code: "METHOD_NOT_ALLOWED", message: "Method not allowed." }
       });
@@ -206,6 +216,7 @@ export class HttpAdapterGateway {
         const statusCode =
           error.code === "ADAPTER_IDENTITY_MISMATCH" ? 403 :
           error.code === "ADAPTER_NOT_CONNECTED" ? 404 :
+          error.code === "ADAPTER_STALE" ? 503 :
           error.code === "PROTOCOL_VERSION_UNSUPPORTED" ? 426 : 400;
 
         this.sendJson(response, statusCode, {
