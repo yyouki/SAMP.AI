@@ -1,0 +1,138 @@
+{
+  "manifest_version": "1.0",
+  "id": "community.scene-auditor",
+  "name": "Scene Auditor",
+  "version": "0.1.0",
+  "description": "Reviews mapping scene data and reports likely duplication, boundary, spacing, and metadata issues without modifying the server.",
+  "publisher": {
+    "name": "SAMP.AI Community",
+    "url": "https://github.com/yyouki/SAMP.AI"
+  },
+  "license": "MIT",
+  "compatibility": {
+    "samp_ai_core": ">=0.1.0 <1.0.0",
+    "protocol_versions": [
+      "0.1"
+    ],
+    "adapters": [
+      "sampai-pawn"
+    ]
+  },
+  "entrypoint": {
+    "kind": "declarative",
+    "file": "skills/scene-auditor.md"
+  },
+  "skills": [
+    {
+      "id": "community.scene-auditor.review",
+      "name": "Scene review",
+      "description": "Inspect a mapping project and report potential structural and layout issues without applying changes.",
+      "instruction_file": "skills/scene-auditor.md",
+      "allowed_tools": [
+        "community.scene-auditor.inspect"
+      ],
+      "required_permissions": [
+        "mapping.view"
+      ],
+      "required_capabilities": [
+        "mapping.inspect"
+      ],
+      "triggers": [
+        "user_request",
+        "permitted_project_event"
+      ],
+      "default_mode": "read_only",
+      "output_contract": "markdown_report",
+      "examples": [
+        "Review the hospital mapping for likely duplicate objects.",
+        "Check whether the props in this project exceed the marked build area."
+      ]
+    }
+  ],
+  "tools": [
+    {
+      "id": "community.scene-auditor.inspect",
+      "description": "Read mapping objects within a project or bounded area for scene quality analysis.",
+      "implementation": "mapping.inspect",
+      "effect": "read",
+      "risk": "low",
+      "required_permissions": [
+        "mapping.view"
+      ],
+      "required_capabilities": [
+        "mapping.inspect"
+      ],
+      "input_schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "area_anchor_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "max_objects": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5000
+          }
+        },
+        "required": [
+          "project_id"
+        ]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "project_id": {
+            "type": "string"
+          },
+          "objects": {
+            "type": "array"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "project_id",
+          "objects",
+          "truncated"
+        ]
+      },
+      "timeout_ms": 5000,
+      "idempotent": true,
+      "compensation": "none"
+    }
+  ],
+  "permissions_requested": [
+    "mapping.view"
+  ],
+  "capabilities_required": [
+    "mapping.inspect"
+  ],
+  "data_access": [
+    "project_metadata",
+    "mapping_data"
+  ],
+  "network": {
+    "outbound": false,
+    "allowed_hosts": [],
+    "reason": "Uses only registered SAMP.AI tools and requires no outbound network access."
+  },
+  "resources": {
+    "max_tool_calls_per_run": 5,
+    "max_run_seconds": 30,
+    "max_context_kb": 128
+  },
+  "tags": [
+    "mapping",
+    "quality",
+    "read-only"
+  ]
+}
