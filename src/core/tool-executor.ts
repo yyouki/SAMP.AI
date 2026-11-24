@@ -1,4 +1,4 @@
-import { AuditPersistenceError, ToolTimeoutError } from "./errors.js";
+import { AuditPersistenceError, AuditRequiredError, ToolTimeoutError } from "./errors.js";
 import type {
   AuditSink,
   ExecutionContext,
@@ -60,6 +60,10 @@ export class ToolExecutor {
         }
       });
       throw error;
+    }
+
+    if (tool.effect !== "read" && !this.audit) {
+      throw new AuditRequiredError(tool.id);
     }
 
     this.schemas.assert(tool.inputSchema, input, `input for ${tool.id}`);
