@@ -92,6 +92,7 @@ The AI may discuss, inspect, plan, and prepare drafts according to the user's pe
 - [Native GTA world objects and undo/redo](docs/NATIVE_WORLD_OBJECTS.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Extensibility and AI autonomy](docs/EXTENSIBILITY_AND_AUTONOMY.md)
+- [Self-expanding skills](docs/SELF_EXPANDING_SKILLS.md)
 
 ## Contributing
 
