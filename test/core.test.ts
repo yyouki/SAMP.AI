@@ -18,7 +18,10 @@ import {
   AdapterRegistry,
   SkillRegistry,
   SkillToolDispatcher,
-  ExecutionContextFactory
+  ExecutionContextFactory,
+  AgentRunner,
+  InMemoryAgentConversationStore,
+  type ModelProvider
 } from "../src/index.js";
 
 const inputSchema = {
@@ -887,4 +890,194 @@ test("non-read tool execution requires an audit sink", async () => {
       "code" in error &&
       error.code === "AUDIT_REQUIRED"
   );
+});
+
+
+test("agent runner exposes only active skill tools and executes through the skill dispatcher", async () => {
+  const registry = new ToolRegistry();
+  registerMockAdapterTools(registry);
+
+  const candidate = await new ExtensionLoader(
+    createDefaultSchemaValidator(),
+    registry
+  ).loadCandidate(resolve(process.cwd(), "examples/extensions/scene-auditor"));
+
+  const skills = new SkillRegistry(
+    { verify: async () => true },
+    { verify: async () => true }
+  );
+  skills.registerCandidate(candidate, "sha256:" + "d".repeat(64));
+  await skills.approveCandidate(candidate.manifest.id, "maintainer-01", "review-token");
+  await skills.enableForServer(
+    candidate.manifest.id,
+    "server-agent",
+    "owner-01",
+    ["mapping.view"],
+    "owner-token"
+  );
+
+  const adapterRegistry = new AdapterRegistry(
+    new ProtocolValidator(createDefaultSchemaValidator())
+  );
+  adapterRegistry.registerHello({
+    protocol: "sampai/0.1",
+    message_id: "hello_agent_001",
+    type: "event",
+    server_instance_id: "server-agent",
+    timestamp: "2026-11-24T15:00:00Z",
+    event: "adapter.hello",
+    payload: {
+      adapter: { name: "sampai-pawn", version: "0.1.0", runtime: "open.mp" },
+      capabilities: ["mapping.inspect"],
+      limits: { max_operations_per_batch: 20, max_objects_per_project: 1000 }
+    }
+  }, {
+    adapterId: "sampai-pawn",
+    serverInstanceId: "server-agent"
+  });
+
+  const contexts = new ExecutionContextFactory(
+    adapterRegistry,
+    {
+      resolve: async (actorId) => ({ id: actorId, permissions: ["mapping.view"] })
+    },
+    {
+      resolve: async () => ({ mode: "observe", autoAllowedToolIds: [] })
+    }
+  );
+
+  const toolExecutor = new ToolExecutor(
+    registry,
+    new PermissionEngine({ verify: async () => true }),
+    new JsonSchemaValidator()
+  );
+  const dispatcher = new SkillToolDispatcher(skills, toolExecutor);
+  let providerCalls = 0;
+  const provider: ModelProvider = {
+    complete: async (request) => {
+      providerCalls += 1;
+      if (providerCalls === 1) {
+        assert.equal(request.tools.length, 1);
+        assert.ok(request.tools[0]?.name.includes("community.scene-auditor.inspect"));
+        return {
+          content: "I will inspect the project.",
+          toolCalls: [{
+            id: "call-01",
+            name: request.tools[0]!.name,
+            arguments: { project_id: "hospital" }
+          }]
+        };
+      }
+
+      assert.equal(request.messages.at(-1)?.role, "tool");
+      return { content: "The project inspection completed." };
+    }
+  };
+
+  const runner = new AgentRunner(
+    provider,
+    new InMemoryAgentConversationStore(),
+    skills,
+    dispatcher,
+    contexts
+  );
+
+  const result = await runner.run({
+    principal: { subject: "mapper-01" },
+    serverInstanceId: "server-agent",
+    projectId: "hospital",
+    sessionId: "session-01",
+    userMessage: "Review the hospital mapping."
+  });
+
+  assert.equal(result.response, "The project inspection completed.");
+  assert.equal(result.steps, 2);
+  assert.equal(result.toolCalls, 1);
+  assert.equal(result.stoppedBecause, "completed");
+});
+
+test("agent runner cannot call a tool absent from the current enabled skill set", async () => {
+  const registry = new ToolRegistry();
+  registerMockAdapterTools(registry);
+  const candidate = await new ExtensionLoader(
+    createDefaultSchemaValidator(),
+    registry
+  ).loadCandidate(resolve(process.cwd(), "examples/extensions/scene-auditor"));
+
+  const skills = new SkillRegistry(
+    { verify: async () => true },
+    { verify: async () => true }
+  );
+  skills.registerCandidate(candidate, "sha256:" + "e".repeat(64));
+  await skills.approveCandidate(candidate.manifest.id, "maintainer-01", "review-token");
+  await skills.enableForServer(
+    candidate.manifest.id,
+    "server-agent-2",
+    "owner-01",
+    ["mapping.view"],
+    "owner-token"
+  );
+
+  const adapterRegistry = new AdapterRegistry(
+    new ProtocolValidator(createDefaultSchemaValidator())
+  );
+  adapterRegistry.registerHello({
+    protocol: "sampai/0.1",
+    message_id: "hello_agent_002",
+    type: "event",
+    server_instance_id: "server-agent-2",
+    timestamp: "2026-11-24T15:00:00Z",
+    event: "adapter.hello",
+    payload: {
+      adapter: { name: "sampai-pawn", version: "0.1.0", runtime: "open.mp" },
+      capabilities: ["mapping.inspect"],
+      limits: { max_operations_per_batch: 20, max_objects_per_project: 1000 }
+    }
+  }, {
+    adapterId: "sampai-pawn",
+    serverInstanceId: "server-agent-2"
+  });
+
+  const contexts = new ExecutionContextFactory(
+    adapterRegistry,
+    { resolve: async (actorId) => ({ id: actorId, permissions: ["mapping.view"] }) },
+    { resolve: async () => ({ mode: "observe", autoAllowedToolIds: [] }) }
+  );
+
+  const runner = new AgentRunner(
+    {
+      complete: async (request) => {
+        assert.equal(request.tools.length, 1);
+        return {
+          content: "I cannot run an unavailable tool.",
+          toolCalls: [{
+            id: "call-unknown",
+            name: "database.drop_all",
+            arguments: {}
+          }]
+        };
+      }
+    },
+    new InMemoryAgentConversationStore(),
+    skills,
+    new SkillToolDispatcher(
+      skills,
+      new ToolExecutor(
+        registry,
+        new PermissionEngine({ verify: async () => true }),
+        new JsonSchemaValidator()
+      )
+    ),
+    contexts
+  );
+
+  const result = await runner.run({
+    principal: { subject: "mapper-02" },
+    serverInstanceId: "server-agent-2",
+    sessionId: "session-02",
+    userMessage: "Delete the database."
+  });
+
+  assert.equal(result.toolCalls, 1);
+  assert.ok(result.response.includes("unavailable") || result.response.includes("cannot"));
 });
