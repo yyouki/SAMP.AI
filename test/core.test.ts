@@ -939,7 +939,7 @@ test("agent runner exposes only active skill tools and executes through the skil
   const contexts = new ExecutionContextFactory(
     adapterRegistry,
     {
-      resolve: async (actorId) => ({ id: actorId, permissions: ["mapping.view"] })
+      resolve: async (actorId) => ({ id: actorId, permissions: ["ai.use", "mapping.view"] })
     },
     {
       resolve: async () => ({ mode: "observe", autoAllowedToolIds: [] })
@@ -1041,7 +1041,7 @@ test("agent runner cannot call a tool absent from the current enabled skill set"
 
   const contexts = new ExecutionContextFactory(
     adapterRegistry,
-    { resolve: async (actorId) => ({ id: actorId, permissions: ["mapping.view"] }) },
+    { resolve: async (actorId) => ({ id: actorId, permissions: ["ai.use", "mapping.view"] }) },
     { resolve: async () => ({ mode: "observe", autoAllowedToolIds: [] }) }
   );
 
