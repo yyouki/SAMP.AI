@@ -1,5 +1,5 @@
-import type { ToolDefinition } from "../shared/contracts.js";
-import { ToolRegistry } from "../core/tool-registry.js";
+import type { ToolDefinition } from "../../shared/contracts.js";
+import { ToolRegistry } from "../../core/tool-registry.js";
 
 const inspectInputSchema = {
   type: "object",
