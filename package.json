@@ -1,0 +1,25 @@
+{
+  "name": "samp-ai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Language-independent AI development assistant for SA-MP and open.mp servers.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "tsx --test test/core.test.ts",
+    "test:watch": "tsx --test --watch test/core.test.ts"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
