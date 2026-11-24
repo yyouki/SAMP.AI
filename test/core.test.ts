@@ -308,12 +308,11 @@ test("extension loader returns a disabled candidate using registered tool bindin
   assert.equal(candidate.manifest.id, "community.scene-auditor");
   assert.equal(candidate.skills.length, 1);
   assert.equal(candidate.skills[0]?.allowedTools[0], "community.scene-auditor.inspect");
-  assert.deepEqual(candidate.toolBindings, [{
-    id: "community.scene-auditor.inspect",
-    implementationId: "mapping.inspect",
-    requiredPermissions: ["mapping.view"],
-    requiredCapabilities: ["mapping.inspect"]
-  }]);
+  assert.equal(candidate.packageHash.startsWith("sha256:"), true);
+  assert.equal(candidate.toolBindings[0]?.id, "community.scene-auditor.inspect");
+  assert.equal(candidate.toolBindings[0]?.implementationId, "mapping.inspect");
+  assert.deepEqual(candidate.toolBindings[0]?.requiredPermissions, ["mapping.view"]);
+  assert.deepEqual(candidate.toolBindings[0]?.requiredCapabilities, ["mapping.inspect"]);
   assert.match(candidate.skills[0]?.instruction ?? "", /Do not modify/);
 });
 
@@ -641,7 +640,7 @@ test("skill registry requires maintainer review before server-owner enablement",
     { verify: async () => true }
   );
 
-  skills.registerCandidate(candidate, "sha256:" + "a".repeat(64));
+  skills.registerCandidate(candidate);
 
   await assert.rejects(
     skills.enableForServer(
@@ -679,7 +678,8 @@ test("skill registry rejects extension permission escalation", async () => {
     { verify: async () => true }
   );
 
-  skills.registerCandidate(candidate, "sha256:" + "b".repeat(64));
+  skills.registerCandidate(candidate);
+  assert.match(candidate.packageHash, /^sha256:[a-f0-9]{64}$/);
   await skills.approveCandidate(candidate.manifest.id, "maintainer-01", "review-token");
 
   await assert.rejects(
@@ -707,7 +707,7 @@ test("skill dispatcher enforces skill tool allowlist and executes implementation
     { verify: async () => true }
   );
 
-  skills.registerCandidate(candidate, "sha256:" + "c".repeat(64));
+  skills.registerCandidate(candidate);
   await skills.approveCandidate(candidate.manifest.id, "maintainer-01", "review-token");
   await skills.enableForServer(
     candidate.manifest.id,
@@ -906,7 +906,7 @@ test("agent runner exposes only active skill tools and executes through the skil
     { verify: async () => true },
     { verify: async () => true }
   );
-  skills.registerCandidate(candidate, "sha256:" + "d".repeat(64));
+  skills.registerCandidate(candidate);
   await skills.approveCandidate(candidate.manifest.id, "maintainer-01", "review-token");
   await skills.enableForServer(
     candidate.manifest.id,
@@ -1008,7 +1008,7 @@ test("agent runner cannot call a tool absent from the current enabled skill set"
     { verify: async () => true },
     { verify: async () => true }
   );
-  skills.registerCandidate(candidate, "sha256:" + "e".repeat(64));
+  skills.registerCandidate(candidate);
   await skills.approveCandidate(candidate.manifest.id, "maintainer-01", "review-token");
   await skills.enableForServer(
     candidate.manifest.id,
