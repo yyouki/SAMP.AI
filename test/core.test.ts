@@ -22,7 +22,9 @@ import {
   AgentRunner,
   InMemoryAgentConversationStore,
   type ModelProvider,
-  OpenAIResponsesProvider
+  OpenAIResponsesProvider,
+  HttpAdapterGateway,
+  InMemoryBearerAdapterAuthenticator
 } from "../src/index.js";
 
 const inputSchema = {
@@ -1365,4 +1367,156 @@ test("OpenAI Responses provider validates configuration", () => {
     }),
     /HTTP or HTTPS/
   );
+});
+
+
+test("HTTP adapter gateway authenticates and registers an adapter handshake", async () => {
+  const registry = new AdapterRegistry(
+    new ProtocolValidator(createDefaultSchemaValidator())
+  );
+  const authenticator = new InMemoryBearerAdapterAuthenticator();
+  const token = "adapter-test-token-12345678901234567890";
+  authenticator.addCredential(token, {
+    adapterId: "sampai-pawn",
+    serverInstanceId: "gateway-server"
+  });
+
+  const gateway = new HttpAdapterGateway(registry, authenticator);
+  const address = await gateway.listen(0, "127.0.0.1");
+  const baseUrl = "http://" + address.host + ":" + address.port;
+
+  try {
+    const health = await fetch(baseUrl + "/health");
+    assert.equal(health.status, 200);
+
+    const hello = await fetch(baseUrl + "/v1/adapters/hello", {
+      method: "POST",
+      headers: {
+        "Authorization": "Bearer " + token,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        protocol: "sampai/0.1",
+        message_id: "gateway_hello_001",
+        type: "event",
+        server_instance_id: "gateway-server",
+        timestamp: "2026-11-24T15:00:00Z",
+        event: "adapter.hello",
+        payload: {
+          adapter: {
+            name: "sampai-pawn",
+            version: "0.1.0",
+            runtime: "open.mp"
+          },
+          capabilities: ["mapping.inspect"],
+          limits: {
+            max_operations_per_batch: 20,
+            max_objects_per_project: 1000
+          }
+        }
+      })
+    });
+
+    assert.equal(hello.status, 201);
+    assert.ok(registry.getServerCapabilities("gateway-server").includes("mapping.inspect"));
+
+    const heartbeat = await fetch(baseUrl + "/v1/adapters/heartbeat", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + token }
+    });
+    assert.equal(heartbeat.status, 200);
+
+    const current = await fetch(baseUrl + "/v1/adapters/me", {
+      headers: { "Authorization": "Bearer " + token }
+    });
+    assert.equal(current.status, 200);
+  } finally {
+    await gateway.close();
+  }
+});
+
+test("HTTP adapter gateway rejects missing and invalid bearer credentials", async () => {
+  const registry = new AdapterRegistry(
+    new ProtocolValidator(createDefaultSchemaValidator())
+  );
+  const authenticator = new InMemoryBearerAdapterAuthenticator();
+  authenticator.addCredential("adapter-test-token-12345678901234567890", {
+    adapterId: "sampai-pawn",
+    serverInstanceId: "gateway-server"
+  });
+
+  const gateway = new HttpAdapterGateway(registry, authenticator);
+  const address = await gateway.listen(0, "127.0.0.1");
+  const baseUrl = "http://" + address.host + ":" + address.port;
+
+  try {
+    const missing = await fetch(baseUrl + "/v1/adapters/heartbeat", {
+      method: "POST"
+    });
+    assert.equal(missing.status, 401);
+
+    const invalid = await fetch(baseUrl + "/v1/adapters/heartbeat", {
+      method: "POST",
+      headers: { "Authorization": "Bearer invalid-token-00000000000000000000" }
+    });
+    assert.equal(invalid.status, 401);
+  } finally {
+    await gateway.close();
+  }
+});
+
+test("HTTP adapter gateway rejects oversized and malformed handshake bodies", async () => {
+  const registry = new AdapterRegistry(
+    new ProtocolValidator(createDefaultSchemaValidator())
+  );
+  const authenticator = new InMemoryBearerAdapterAuthenticator();
+  const token = "adapter-test-token-12345678901234567890";
+  authenticator.addCredential(token, {
+    adapterId: "sampai-pawn",
+    serverInstanceId: "gateway-server"
+  });
+
+  const gateway = new HttpAdapterGateway(registry, authenticator, {
+    maxBodyBytes: 128
+  });
+  const address = await gateway.listen(0, "127.0.0.1");
+  const baseUrl = "http://" + address.host + ":" + address.port;
+  const headers = {
+    "Authorization": "Bearer " + token,
+    "Content-Type": "application/json"
+  };
+
+  try {
+    const oversized = await fetch(baseUrl + "/v1/adapters/hello", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ payload: "x".repeat(512) })
+    });
+    assert.equal(oversized.status, 413);
+
+    const malformed = await fetch(baseUrl + "/v1/adapters/hello", {
+      method: "POST",
+      headers,
+      body: "{bad-json"
+    });
+    assert.equal(malformed.status, 400);
+  } finally {
+    await gateway.close();
+  }
+});
+
+test("bearer authenticator revokes a credential without exposing the token", async () => {
+  const authenticator = new InMemoryBearerAdapterAuthenticator();
+  const token = "adapter-test-token-12345678901234567890";
+  authenticator.addCredential(token, {
+    adapterId: "sampai-pawn",
+    serverInstanceId: "gateway-server"
+  });
+
+  assert.equal(
+    (await authenticator.authenticate("Bearer " + token))?.adapterId,
+    "sampai-pawn"
+  );
+  assert.equal(authenticator.revokeCredential(token), true);
+  assert.equal(await authenticator.authenticate("Bearer " + token), undefined);
 });
