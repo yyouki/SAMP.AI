@@ -4,7 +4,7 @@
 
 SAMP.AI is intended to help server owners and developers design, inspect, preview, and manage in-game content such as map objects and TextDraw interfaces. It is designed as a collaborative assistant: it can propose ideas proactively, but it must discuss uncertain requirements and obtain the required approval before applying changes.
 
-**Project status: Planning / specification stage.** The repository is being established. Features described here are goals, not claims of implemented functionality.
+**Project status: Early core scaffold.** The repository contains initial TypeScript core primitives, extension schemas, a declarative extension loader, and tests. A production AI agent, live open.mp adapter, model provider, and runtime installer are not implemented yet.
 
 ## Project goals
 
@@ -40,6 +40,12 @@ SAMP.AI is intended to help server owners and developers design, inspect, previe
 
 ### Extensible development skills
 Mapping and TextDraw are initial skills, not the product boundary. Future skills may cover diagnostics, code and resource assistance, database planning, performance analysis, gameplay systems, NPCs, testing, documentation, and controlled deployment workflows. See [Extensibility and AI Autonomy](docs/EXTENSIBILITY_AND_AUTONOMY.md).
+
+## Core runtime
+
+The standalone core is initially implemented in TypeScript on Node.js 22 or later. This does not constrain game-mode languages: server integrations remain independent adapters using the versioned protocol.
+
+See [Core Implementation](docs/CORE_IMPLEMENTATION.md).
 
 ## High-level architecture
 
