@@ -3,6 +3,27 @@ import type { ToolDefinition } from "../shared/contracts.js";
 
 const TOOL_ID_PATTERN = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9_-]*)+$/;
 
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value as Record<string, unknown>)) {
+      deepFreeze(child);
+    }
+  }
+  return value;
+}
+
+function snapshotTool(tool: ToolDefinition): ToolDefinition {
+  // Copy caller-owned arrays and JSON schemas before freezing registry metadata.
+  return deepFreeze({
+    ...tool,
+    requiredPermissions: [...tool.requiredPermissions],
+    requiredCapabilities: [...tool.requiredCapabilities],
+    inputSchema: structuredClone(tool.inputSchema),
+    outputSchema: structuredClone(tool.outputSchema)
+  });
+}
+
 export class ToolRegistry {
   private readonly byId = new Map<string, ToolDefinition>();
   private readonly byImplementation = new Map<string, ToolDefinition>();
@@ -26,11 +47,9 @@ export class ToolRegistry {
       throw new Error("Tool timeout must be between 100ms and 30000ms.");
     }
 
-    this.byId.set(tool.id, Object.freeze({ ...tool }));
-    this.byImplementation.set(
-      tool.implementationId,
-      Object.freeze({ ...tool })
-    );
+    const snapshot = snapshotTool(tool);
+    this.byId.set(snapshot.id, snapshot);
+    this.byImplementation.set(snapshot.implementationId, snapshot);
   }
 
   get(toolId: string): ToolDefinition {
