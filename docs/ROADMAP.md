@@ -16,6 +16,7 @@ This roadmap prioritizes a safe, testable end-to-end path before adding more ada
 - [x] Add TypeScript protocol validator and valid/invalid message tests.
 - [x] Add CI workflow for source/test type-checking, unit tests, and TypeScript build.
 - [x] Add reusable JSON Schema validation for extension schemas.
+- [x] Add an adapter registry that binds hello messages to authenticated identities and tracks capabilities.
 - [ ] Build a mock adapter that can simulate player state, anchors, markers, server objects, native-world removal directives, and failures.
 - [ ] Add contract tests so every adapter must pass the same protocol suite.
 - [x] Add initial registry, permission, execution, and declarative extension-loader tests.
