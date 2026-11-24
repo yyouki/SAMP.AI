@@ -15,7 +15,9 @@ import {
   createDefaultSchemaValidator,
   registerMockAdapterTools,
   ProtocolValidator,
-  AdapterRegistry
+  AdapterRegistry,
+  SkillRegistry,
+  SkillToolDispatcher
 } from "../src/index.js";
 
 const inputSchema = {
@@ -610,5 +612,140 @@ test("adapter registry replaces stale capabilities on reconnect", () => {
   assert.deepEqual(
     registry.getServerCapabilities("server_ls_01"),
     ["mapping.inspect"]
+  );
+});
+
+
+test("skill registry requires maintainer review before server-owner enablement", async () => {
+  const registry = new ToolRegistry();
+  registerMockAdapterTools(registry);
+  const loader = new ExtensionLoader(createDefaultSchemaValidator(), registry);
+  const candidate = await loader.loadCandidate(
+    resolve(process.cwd(), "examples/extensions/scene-auditor")
+  );
+
+  const skills = new SkillRegistry(
+    { verify: async () => true },
+    { verify: async () => true }
+  );
+
+  skills.registerCandidate(candidate, "sha256:" + "a".repeat(64));
+
+  await assert.rejects(
+    skills.enableForServer(
+      candidate.manifest.id,
+      "server-test",
+      "owner-01",
+      ["mapping.view"],
+      "owner-token"
+    ),
+    /requires maintainer review/
+  );
+
+  await skills.approveCandidate(candidate.manifest.id, "maintainer-01", "review-token");
+  await skills.enableForServer(
+    candidate.manifest.id,
+    "server-test",
+    "owner-01",
+    ["mapping.view"],
+    "owner-token"
+  );
+
+  assert.deepEqual(skills.getState(candidate.manifest.id).enabledServers, ["server-test"]);
+});
+
+test("skill registry rejects extension permission escalation", async () => {
+  const registry = new ToolRegistry();
+  registerMockAdapterTools(registry);
+  const candidate = await new ExtensionLoader(
+    createDefaultSchemaValidator(),
+    registry
+  ).loadCandidate(resolve(process.cwd(), "examples/extensions/scene-auditor"));
+
+  const skills = new SkillRegistry(
+    { verify: async () => true },
+    { verify: async () => true }
+  );
+
+  skills.registerCandidate(candidate, "sha256:" + "b".repeat(64));
+  await skills.approveCandidate(candidate.manifest.id, "maintainer-01", "review-token");
+
+  await assert.rejects(
+    skills.enableForServer(
+      candidate.manifest.id,
+      "server-test",
+      "owner-01",
+      ["mapping.delete"],
+      "owner-token"
+    ),
+    /Cannot grant undeclared/
+  );
+});
+
+test("skill dispatcher enforces skill tool allowlist and executes implementation alias", async () => {
+  const registry = new ToolRegistry();
+  registerMockAdapterTools(registry);
+  const candidate = await new ExtensionLoader(
+    createDefaultSchemaValidator(),
+    registry
+  ).loadCandidate(resolve(process.cwd(), "examples/extensions/scene-auditor"));
+
+  const skills = new SkillRegistry(
+    { verify: async () => true },
+    { verify: async () => true }
+  );
+
+  skills.registerCandidate(candidate, "sha256:" + "c".repeat(64));
+  await skills.approveCandidate(candidate.manifest.id, "maintainer-01", "review-token");
+  await skills.enableForServer(
+    candidate.manifest.id,
+    "server-test",
+    "owner-01",
+    ["mapping.view"],
+    "owner-token"
+  );
+
+  const executor = new ToolExecutor(
+    registry,
+    new PermissionEngine({ verify: async () => true }),
+    new JsonSchemaValidator()
+  );
+  const dispatcher = new SkillToolDispatcher(skills, executor);
+
+  const result = await dispatcher.execute(
+    candidate.manifest.id,
+    "community.scene-auditor.review",
+    "community.scene-auditor.inspect",
+    { project_id: "hospital" },
+    {
+      actor: { id: "mapper-01", permissions: ["mapping.view"] },
+      serverInstanceId: "server-test",
+      projectId: "hospital",
+      adapterCapabilities: ["mapping.inspect"],
+      autonomy: "observe"
+    }
+  );
+
+  assert.deepEqual(result, {
+    project_id: "hospital",
+    objects: [],
+    truncated: false
+  });
+
+  await assert.rejects(
+    dispatcher.execute(
+      candidate.manifest.id,
+      "community.scene-auditor.review",
+      "mapping.delete",
+      { project_id: "hospital" },
+      {
+        actor: { id: "mapper-01", permissions: ["mapping.view"] },
+        serverInstanceId: "server-test",
+        projectId: "hospital",
+        adapterCapabilities: ["mapping.inspect"],
+        autonomy: "observe"
+      }
+    ),
+    /not allowed for skill/
   );
 });
