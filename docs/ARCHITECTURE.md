@@ -61,7 +61,7 @@ The initial source scaffold provides:
 - an adapter registry that binds capability snapshots to authenticated adapter identities;
 - a deterministic mock mapping-inspection tool and unit tests.
 
-The extension loader returns a **disabled candidate**. It does not install or activate extensions. The approval verifier is an injected interface; a production cryptographic approval service and persistent identity store are still required.
+The extension loader returns a **disabled candidate**. The skill registry requires maintainer review and separate server-owner enablement for each server. A skill dispatcher enforces its explicit tool allowlist before delegating to the executor. Review and enablement verifiers are injected interfaces; production cryptographic services and persistent storage are still required.
 
 ## 4. Suggested deployment
 
