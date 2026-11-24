@@ -27,13 +27,29 @@ npm run build
 |---|---|
 | `src/shared/contracts.ts` | Tool, actor, approval, and audit contracts |
 | `src/validation/json-schema-validator.ts` | Ajv-based JSON Schema validation |
-| `src/validation/create-default-schema-validator.ts` | Registers repository extension schemas |
+| `src/validation/create-default-schema-validator.ts` | Registers extension and protocol schemas |
+| `src/protocol/protocol-validator.ts` | Validates message envelopes, adapter handshakes, and coordinates |
 | `src/core/tool-registry.ts` | Tool and implementation registry |
 | `src/security/permission-engine.ts` | Permission, capability, autonomy, and approval gates |
 | `src/core/tool-executor.ts` | Validates and runs registered tools with timeout and audit hooks |
 | `src/extensions/extension-loader.ts` | Validates and loads declarative extension candidates |
 | `src/adapters/mock/register-mock-tools.ts` | Deterministic mock mapping inspection tool |
 | `test/core.test.ts` | Initial core unit tests |
+
+## Protocol validation
+
+The default schema validator includes the versioned protocol schemas. The protocol validator checks messages and coordinates before they cross a trusted adapter boundary.
+
+```ts
+import {
+  createDefaultSchemaValidator,
+  ProtocolValidator
+} from "./src/index.js";
+
+const protocol = new ProtocolValidator(createDefaultSchemaValidator());
+const adapterHello = protocol.validateAdapterHello(incomingMessage);
+console.log(adapterHello.payload.capabilities);
+```
 
 ## Minimal usage
 
