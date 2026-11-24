@@ -6,7 +6,7 @@ const TOOL_ID_PATTERN = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9_-]*)+$/;
 function deepFreeze<T>(value: T): T {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
     Object.freeze(value);
-    for (const child of Object.values(value as Record<string, unknown>)) {
+    for (const child of Object.values(value as unknown as Record<string, unknown>)) {
       deepFreeze(child);
     }
   }
