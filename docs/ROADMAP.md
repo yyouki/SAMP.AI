@@ -31,6 +31,8 @@ This roadmap prioritizes a safe, testable end-to-end path before adding more ada
 - [x] Add tool input/output validation, timeouts, and optional audit events.
 - [ ] Integrate a model provider and structured model tool-calling loop.
 - [ ] Implement signed approval receipts and persistent audit storage.
+- [x] Add in-memory skill lifecycle: candidate → maintainer review → server-owner enablement.
+- [x] Enforce per-skill tool allowlists through a dedicated dispatcher.
 - [ ] Add usage budgets and cancellation propagation across model calls.
 
 **Exit condition:** AI can discuss a request, ask clarifying questions, produce a structured plan, and cannot apply it without approval.
