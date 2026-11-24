@@ -132,7 +132,11 @@ export class AgentRunner {
         request.principal,
         request.serverInstanceId,
         request.projectId,
-        { signal: controller.signal }
+        {
+          signal: controller.signal,
+          ...(request.draftHash ? { draftHash: request.draftHash } : {}),
+          ...(request.approval ? { approval: request.approval } : {})
+        }
       );
     } catch (error) {
       clearTimeout(timer);
