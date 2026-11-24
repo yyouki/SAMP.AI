@@ -1,6 +1,7 @@
 import { SampAiError } from "../core/errors.js";
 import type {
   ActorIdentity,
+  ApprovalReceipt,
   AutonomyMode,
   ExecutionContext
 } from "../shared/contracts.js";
@@ -32,6 +33,11 @@ export interface AutonomyPolicyResolver {
   ): Promise<AutonomyPolicy>;
 }
 
+export interface ExecutionContextOptions {
+  readonly draftHash?: string;
+  readonly approval?: ApprovalReceipt;
+}
+
 /**
  * Builds execution contexts from trusted identity, server policy, and live adapter capabilities.
  * Do not call this with identity or permissions supplied by an AI model or game client payload.
@@ -46,7 +52,8 @@ export class ExecutionContextFactory {
   async create(
     principal: TrustedRequestPrincipal,
     serverInstanceId: string,
-    projectId?: string
+    projectId?: string,
+    options: ExecutionContextOptions = {}
   ): Promise<ExecutionContext> {
     if (!principal.subject.trim() || !serverInstanceId.trim()) {
       throw new SampAiError(
@@ -77,7 +84,9 @@ export class ExecutionContextFactory {
       ...(projectId ? { projectId } : {}),
       adapterCapabilities: Object.freeze([...capabilities]),
       autonomy: policy.mode,
-      autoAllowedToolIds: Object.freeze([...policy.autoAllowedToolIds])
+      autoAllowedToolIds: Object.freeze([...policy.autoAllowedToolIds]),
+      ...(options.draftHash ? { draftHash: options.draftHash } : {}),
+      ...(options.approval ? { approval: options.approval } : {})
     });
   }
 }
