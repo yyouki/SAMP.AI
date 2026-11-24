@@ -229,13 +229,6 @@ export class ExtensionLoader {
         allowedBindings.flatMap((binding) => binding.required_capabilities)
       );
 
-      const unusedSkillPermissions = skill.required_permissions.filter(
-        (permission) => !allowedPermissions.has(permission)
-      );
-      const unusedSkillCapabilities = skill.required_capabilities.filter(
-        (capability) => !allowedCapabilities.has(capability)
-      );
-
       if (
         !sameStringSet(skill.required_permissions, [...allowedPermissions]) ||
         !sameStringSet(skill.required_capabilities, [...allowedCapabilities])
