@@ -34,7 +34,7 @@ A dynamic registry exposes only installed and enabled skills/tools that match th
 Evaluates the actor, permission, resource, project, and action. It also enforces approval rules and records who approved what revision.
 
 ### Protocol gateway
-Validates messages against versioned schemas, authenticates adapters, applies request limits, and handles reconnects and idempotency.
+Validates messages against versioned schemas, authenticates adapters, applies request limits, and handles reconnects and idempotency. The initial HTTP adapter gateway exposes registration, heartbeat, inspection, and disconnect routes; it is not yet a general action transport. See [HTTP Adapter Gateway](ADAPTER_GATEWAY.md).
 
 ### Adapter
 Runs beside or inside the server integration. It advertises supported operations and limits, reads server/editor state, queues mutations safely, and returns execution results.
