@@ -47,7 +47,21 @@ The first extension format is declarative: skills compose existing registered to
 ### Dashboard / in-game UI
 Provides chat, project browser, coordinate tools, previews, review queues, and audit history. An in-game command interface may be a small adapter-facing UI, not the only user interface.
 
-## 3. Suggested deployment
+## 3. Initial core implementation decision
+
+The first standalone core runtime uses **TypeScript on Node.js 22+**. This choice is for the service layer, developer tooling, schema validation, and extension workflow—not for gamemode code. Pawn, C++, Rust, TypeScript/JavaScript, and other integrations communicate through adapters and the language-neutral protocol.
+
+The initial source scaffold provides:
+- an in-memory tool registry with immutable metadata snapshots;
+- JSON Schema validation using Ajv;
+- permission, adapter-capability, autonomy, and approval checks;
+- a timed tool executor with optional audit events;
+- a declarative extension candidate loader with path containment checks;
+- a deterministic mock mapping-inspection tool and unit tests.
+
+The extension loader returns a **disabled candidate**. It does not install or activate extensions. The approval verifier is an injected interface; a production cryptographic approval service and persistent identity store are still required.
+
+## 4. Suggested deployment
 
 For the first release, use a simple deployment:
 
@@ -59,7 +73,7 @@ For the first release, use a simple deployment:
 
 Do not start with microservices. Keep modules inside a modular monolith until scaling evidence justifies splitting them.
 
-## 4. Request and execution lifecycle
+## 5. Request and execution lifecycle
 
 ```text
 User / permitted server event
@@ -94,7 +108,7 @@ Verification + revision history
 
 A request to inspect or propose does not imply permission to mutate. Approval must be bound to an immutable draft/revision hash so that a changed draft needs a new approval.
 
-## 5. Coordinate and world context
+## 6. Coordinate and world context
 
 Coordinates are not plain numbers without context. A position should include:
 - coordinate frame: world or local-to-anchor;
@@ -106,7 +120,7 @@ Coordinates are not plain numbers without context. A position should include:
 
 The coordinate resolver should use evidence exposed by the adapter. It must not claim an exact surface hit if the adapter only provides player position and facing direction. See [Coordinate and Marker Workflow](COORDINATES_AND_MARKERS.md).
 
-## 6. Capability negotiation
+## 7. Capability negotiation
 
 At connection time, an adapter reports:
 - protocol versions supported;
@@ -120,7 +134,7 @@ At connection time, an adapter reports:
 
 The AI must degrade gracefully. If an exact raycast is unavailable, it should request a selected point or label its calculated point as an estimate. The same principle applies to every domain: discover capabilities, explain unavailable operations, and never claim access the adapter does not provide.
 
-## 7. Reliability
+## 8. Reliability
 
 - Use a unique request ID and idempotency key for every mutation request.
 - Use operation IDs for each object / UI element.
@@ -129,7 +143,7 @@ The AI must degrade gracefully. If an exact raycast is unavailable, it should re
 - Treat reconnects as normal; adapters should report current state and pending operation status.
 - Keep an audit log of draft, approval, execution, failure, undo, and restore events.
 
-## 8. Security boundaries
+## 9. Security boundaries
 
 - Never expose model-provider credentials to game clients.
 - Authenticate each adapter and scope it to its server instance.
