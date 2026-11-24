@@ -32,6 +32,7 @@ npm run build
 | `src/adapters/adapter-registry.ts` | Stores authenticated adapter identities and advertised capabilities |
 | `src/core/tool-registry.ts` | Tool and implementation registry |
 | `src/security/permission-engine.ts` | Permission, capability, autonomy, and approval gates |
+| `src/security/execution-context-factory.ts` | Builds context from trusted principal, permissions, policy, and adapter capabilities |
 | `src/core/tool-executor.ts` | Validates and runs registered tools with timeout and audit hooks |
 | `src/extensions/extension-loader.ts` | Validates and loads declarative extension candidates |
 | `src/extensions/skill-registry.ts` | Tracks candidates, maintainer review, and per-server activation |
@@ -44,6 +45,10 @@ npm run build
 The adapter registry accepts a validated hello only when the server instance and adapter name match identity supplied by trusted transport authentication. It replaces stale capabilities on reconnect and exposes the union of capabilities for a server instance.
 
 The registry does not implement credential authentication itself. A future HTTP/WebSocket gateway must authenticate the adapter first and pass the resulting trusted identity into `registerHello`. `ExecutionContextFactory` similarly resolves user permissions and autonomy from trusted backend services and can attach a server-verified approval receipt.
+
+## Execution context
+
+The execution context factory accepts a principal already authenticated by a future gateway, resolves the actor's server/project permissions and autonomy policy, and obtains capabilities from the adapter registry. It accepts an approval receipt only as an input supplied by trusted backend approval storage; the permission engine still verifies the receipt through the injected approval verifier.
 
 ## Protocol validation
 
