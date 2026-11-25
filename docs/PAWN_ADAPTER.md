@@ -2,14 +2,16 @@
 
 **Status:** reference filterscript; the TypeScript action contracts are covered by CI, but the Pawn file has not yet been compiled against a real server/plugin combination or live-tested. Treat it as an integration starter, not a production-ready adapter.
 
-The sample is in `adapters/pawn/samp_ai_adapter.pwn`. It uses the same authenticated task routes as the TypeScript gateway and executes only two allowlisted actions:
+The sample is in `adapters/pawn/samp_ai_adapter.pwn`. It uses the same authenticated task routes as the TypeScript gateway and executes four allowlisted actions:
 
 | Action | Result |
 |---|---|
-| `context.get_player_state` | Reads position, facing angle, interior, and virtual world for an online player. |
+| `context.get_player_state` | Reads position, facing angle, interior, virtual world, and the current connection-session ID for an online player. |
 | `mapping.create_object` | Creates a server-wide global `CreateObject` object. The native does not scope it to one interior or virtual world. |
+| `mapping.preview_player_object` | Creates or replaces one temporary `CreatePlayerObject` preview visible only to the target player session. |
+| `mapping.clear_player_preview` | Removes the preview only when player ID, connection session, and preview ID still match. |
 
-It deliberately does not advertise marker, TextDraw, delete, native-world removal, or arbitrary code execution capabilities.
+It deliberately does not advertise marker, TextDraw, global mapping deletion/update, native-world removal, or arbitrary code execution capabilities.
 
 ## Why an external HTTPS transport is required
 
@@ -101,11 +103,14 @@ taskQueue.enqueue({
 });
 ```
 
-The action contracts are exported from `src/adapters/pawn/register-pawn-actions.ts`. The adapter handshake advertises exactly `context.player_state` and `mapping.create_object`; the queue checks those capabilities before dispatch.
+The action contracts are exported from `src/adapters/pawn/register-pawn-actions.ts`. The adapter handshake advertises exactly `context.player_state`, `mapping.create_object`, `mapping.preview_player_object`, and `mapping.clear_player_preview`; the queue checks those capabilities before dispatch.
 
 ## Runtime behavior and limitations
 
 - The filterscript sends `adapter.hello`, polls `GET /v1/adapters/tasks/next` every 1.5 seconds, and sends an authenticated heartbeat every 15 seconds.
+- `CreatePlayerObject` previews are visible only to the targeted player. The adapter keeps at most one preview per player at a time; a successfully created replacement supersedes the previous preview.
+- The preview payload includes `player_session_id`, returned by `context.get_player_state`. This prevents a delayed task for a disconnected player from applying to a different person who later receives the same player ID.
+- The filterscript destroys tracked previews on `OnPlayerDisconnect` and on filterscript unload. `mapping.clear_player_preview` also requires the matching preview ID and session ID; stale clear tasks cannot delete a newer preview.
 - Its UTC timestamps rely on the host clock being correctly configured to UTC. The config flag is an operator assertion, not an automatic timezone detector.
 - It handles one task at a time. The result is posted with the lease token returned by the claim endpoint.
 - The result callback must confirm HTTP 200 before the adapter polls another task. If result submission is uncertain after a game-side mutation, the adapter pauses instead of processing another task.
@@ -114,7 +119,7 @@ The action contracts are exported from `src/adapters/pawn/register-pawn-actions.
 - The sample accepts only requests with `interior_id: 0` and `virtual_world_id: 0` as a conservative precondition. **This does not scope the created object to those values.** `CreateObject` creates a global server object; it has no player/interior/virtual-world selector. The result therefore reports `scope: "global"` and echoes the requested context under `requested_interior_id` / `requested_virtual_world_id`. Do not use this action when the object must be isolated to a particular interior or virtual world. A future adapter action must use player-specific objects or a runtime/streamer integration with tested context scoping.
 - It caps its own create operations at 400 per filterscript lifetime. That counter resets when the filterscript reloads and is not a durable object inventory. The runtime's native object pool can also impose its own limit.
 - `runtime_object_id` is the numeric handle returned by `CreateObject`; `object_id` remains the project's logical object identifier.
-- It does not implement task lease renewal, mapping inspection/update/delete, object streaming, preview markers, TextDraw, native-world removal, project persistence, or undo/redo.
+- It does not implement task lease renewal, mapping inspection/update/delete, object streaming, TextDraw, native-world removal, project persistence, durable preview state, or undo/redo.
 - Keep the filterscript loaded continuously while tasks are in flight. Restarting or reloading during an operation can leave the queue with an unknown outcome; inspect server state before re-enabling mutations.
 
 For a production adapter, add durable task/operation storage, a recoverable mapping-object index, bounded per-tick native work, object catalog validation, runtime-aware interior/virtual-world support, explicit compensation, and integration tests against the exact SA-MP/open.mp runtime and plugin versions being deployed.
