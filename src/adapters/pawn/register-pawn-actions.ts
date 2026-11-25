@@ -62,8 +62,8 @@ const createObjectAction: AdapterActionDefinition = {
       model_id: { type: "integer", minimum: 1, maximum: 65535 },
       position: vectorSchema,
       rotation: vectorSchema,
-      interior_id: { type: "integer", minimum: 0, maximum: 255 },
-      virtual_world_id: { type: "integer", minimum: 0, maximum: 2147483647 }
+      interior_id: { const: 0, description: "Only the default interior is accepted; CreateObject remains a global object." },
+      virtual_world_id: { const: 0, description: "Only the default virtual world is accepted; CreateObject remains a global object." }
     },
     required: [
       "operation_id",
