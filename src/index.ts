@@ -21,3 +21,4 @@ export * from "./agent/in-memory-conversation-store.js";
 export * from "./agent/agent-runner.js";
 export * from "./providers/openai-responses-provider.js";
 export * from "./shared/contracts.js";
+export * from "./adapters/pawn/register-pawn-actions.js";
