@@ -121,9 +121,9 @@ compile_target() {
   : > "$generated_source"
   if [[ "$target_mode" == "samp" ]]; then
     # These defines must be present before a_samp/open.mp includes are parsed.
-    printf '#define SAMP_COMPAT\\n#define SAMP_AI_OPEN_MP\\n' > "$generated_source"
+    printf '#define SAMP_COMPAT\n#define SAMP_AI_OPEN_MP\n' > "$generated_source"
   else
-    printf '#define OPEN_MP_NO_WRAPPER_WARNING\\n#define SAMP_AI_OPEN_MP\\n' > "$generated_source"
+    printf '#define OPEN_MP_NO_WRAPPER_WARNING\n#define SAMP_AI_OPEN_MP\n' > "$generated_source"
   fi
   cat "$SOURCE" >> "$generated_source"
 
