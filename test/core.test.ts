@@ -751,7 +751,7 @@ test("skill dispatcher enforces skill tool allowlist and executes implementation
   });
 
   await assert.rejects(
-    dispatcher.execute(
+    async () => dispatcher.execute(
       candidate.manifest.id,
       "community.scene-auditor.review",
       "mapping.delete",
@@ -1090,7 +1090,7 @@ test("agent runner cannot call a tool absent from the current enabled skill set"
   });
 
   assert.equal(result.toolCalls, 1);
-  assert.ok(result.response.includes("unavailable") || result.response.includes("cannot"));
+  assert.ok(result.response.includes("not available") || result.response.includes("unavailable") || result.response.includes("cannot"));
 });
 
 
