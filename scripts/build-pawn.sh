@@ -119,12 +119,9 @@ compile_target() {
 
   mkdir -p "$target_dir"
   : > "$generated_source"
-  if [[ "$target_mode" == "samp" ]]; then
-    # These defines must be present before a_samp/open.mp includes are parsed.
-    printf '#define SAMP_COMPAT\n#define SAMP_AI_OPEN_MP\n' > "$generated_source"
-  else
-    printf '#define OPEN_MP_NO_WRAPPER_WARNING\n#define SAMP_AI_OPEN_MP\n' > "$generated_source"
-  fi
+  # Both targets use the open.mp standard include package's SA-MP-compatible
+  # native surface. The runtime target changes only the output artifact name.
+  printf '#define OPEN_MP_NO_WRAPPER_WARNING\n#define SAMP_AI_OPEN_MP\n' > "$generated_source"
   cat "$SOURCE" >> "$generated_source"
 
   echo "Compiling Pawn adapter for $target..."
@@ -154,7 +151,7 @@ cat > "$OUTPUT_DIR/build-info.txt" <<EOF
 SAMP.AI Pawn build provenance
 Source commit: ${GITHUB_SHA:-local}
 Pawn compiler: openmultiplayer/compiler v$PAWN_COMPILER_VERSION
-SA-MP target: openmultiplayer/omp-stdlib@$OMP_STDLIB_SHA with SAMP_COMPAT
+SA-MP target: openmultiplayer/omp-stdlib@$OMP_STDLIB_SHA (SA-MP-compatible native surface)
 open.mp target: openmultiplayer/omp-stdlib@$OMP_STDLIB_SHA
 HTTPS include: https_samp $HTTPS_SAMP_VERSION
 JSON include: pawn-json-parser@$JSON_PARSER_SHA
