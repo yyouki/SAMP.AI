@@ -120,6 +120,7 @@ test("mock game adapter simulates player context, anchors, markers, and native d
 
   adapter.setPlayerState({
     player_id: 7,
+    session_id: "mock-player-7-session-01",
     position: { x: 100, y: 200, z: 5 },
     facing: 180,
     interior_id: 3,
@@ -189,6 +190,116 @@ test("mock game adapter simulates player context, anchors, markers, and native d
     adapter.getNativeRemovalDirectives()[0]?.undo_strategy,
     "reconnect_required"
   );
+});
+
+test("mock game adapter scopes previews to a player session and ignores stale clears", () => {
+  const { queue, adapter } = createMockHarness();
+
+  adapter.setPlayerState({
+    player_id: 7,
+    session_id: "mock-player-7-session-01",
+    position: { x: 100, y: 200, z: 5 },
+    facing: 180,
+    interior_id: 3,
+    virtual_world_id: 42
+  });
+
+  enqueue(queue, "mapping.preview_player_object", {
+    preview_id: "hospital-preview-01",
+    project_id: "hospital",
+    player_id: 7,
+    player_session_id: "mock-player-7-session-01",
+    model_id: 19377,
+    position: { x: 110, y: 210, z: 5 },
+    rotation: { x: 0, y: 0, z: 90 }
+  }, "preview-create-0001");
+  const first = processOne(adapter);
+  assert.equal(first.state, "succeeded");
+  assert.equal(
+    (first.result?.output as { scope: string }).scope,
+    "player"
+  );
+  assert.equal(adapter.getPlayerPreview(7)?.preview_id, "hospital-preview-01");
+
+  // A stale clear cannot remove a newer preview in the same session.
+  enqueue(queue, "mapping.preview_player_object", {
+    preview_id: "hospital-preview-02",
+    project_id: "hospital",
+    player_id: 7,
+    player_session_id: "mock-player-7-session-01",
+    model_id: 19377,
+    position: { x: 115, y: 215, z: 5 },
+    rotation: { x: 0, y: 0, z: 180 }
+  }, "preview-create-0002");
+  assert.equal(processOne(adapter).state, "succeeded");
+
+  enqueue(queue, "mapping.clear_player_preview", {
+    preview_id: "hospital-preview-01",
+    player_id: 7,
+    player_session_id: "mock-player-7-session-01"
+  }, "preview-stale-clear-0001");
+  const staleClear = processOne(adapter);
+  assert.equal(staleClear.state, "succeeded");
+  assert.equal(
+    (staleClear.result?.output as { cleared: boolean }).cleared,
+    false
+  );
+  assert.equal(adapter.getPlayerPreview(7)?.preview_id, "hospital-preview-02");
+
+  // Reusing the player ID in a new session drops the previous session's preview.
+  adapter.setPlayerState({
+    player_id: 7,
+    session_id: "mock-player-7-session-02",
+    position: { x: 120, y: 220, z: 5 },
+    facing: 90,
+    interior_id: 0,
+    virtual_world_id: 0
+  });
+  assert.equal(adapter.getPlayerPreview(7), undefined);
+
+  enqueue(queue, "mapping.preview_player_object", {
+    preview_id: "hospital-preview-03",
+    project_id: "hospital",
+    player_id: 7,
+    player_session_id: "mock-player-7-session-02",
+    model_id: 19377,
+    position: { x: 120, y: 220, z: 5 },
+    rotation: { x: 0, y: 0, z: 90 }
+  }, "preview-create-0003");
+  assert.equal(processOne(adapter).state, "succeeded");
+
+  enqueue(queue, "mapping.clear_player_preview", {
+    preview_id: "hospital-preview-02",
+    player_id: 7,
+    player_session_id: "mock-player-7-session-01"
+  }, "preview-old-session-clear-0001");
+  const oldSessionClear = processOne(adapter);
+  assert.equal(oldSessionClear.state, "succeeded");
+  assert.equal(adapter.getPlayerPreview(7)?.preview_id, "hospital-preview-03");
+
+  enqueue(queue, "mapping.clear_player_preview", {
+    preview_id: "hospital-preview-03",
+    player_id: 7,
+    player_session_id: "mock-player-7-session-02"
+  }, "preview-clear-0003");
+  const cleared = processOne(adapter);
+  assert.equal(cleared.state, "succeeded");
+  assert.equal((cleared.result?.output as { cleared: boolean }).cleared, true);
+  assert.equal(adapter.getPlayerPreview(7), undefined);
+
+  // Disconnect cleanup also destroys any remaining player-scoped preview.
+  enqueue(queue, "mapping.preview_player_object", {
+    preview_id: "hospital-preview-04",
+    project_id: "hospital",
+    player_id: 7,
+    player_session_id: "mock-player-7-session-02",
+    model_id: 19377,
+    position: { x: 120, y: 220, z: 5 },
+    rotation: { x: 0, y: 0, z: 90 }
+  }, "preview-create-0004");
+  assert.equal(processOne(adapter).state, "succeeded");
+  adapter.disconnectPlayer(7);
+  assert.equal(adapter.getPlayerPreview(7), undefined);
 });
 
 test("mock game adapter returns deterministic injected failures as task results", () => {
