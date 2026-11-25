@@ -82,6 +82,13 @@ test("Pawn mapping action schema accepts a supported global object task and resu
   };
 
   schemas.assert(create.payloadSchema, payload, "Pawn mapping payload");
+  assert.throws(
+    () => schemas.assert(create.payloadSchema, {
+      ...payload,
+      virtual_world_id: 1
+    }, "unsupported Pawn mapping context"),
+    /Invalid unsupported Pawn mapping context/
+  );
 
   const result = {
     object_id: "hospital-wall-01",
