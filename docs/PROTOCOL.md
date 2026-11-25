@@ -1,5 +1,7 @@
 # Universal Protocol (Draft)
 
+> **Language:** [English](PROTOCOL.md) | [Bahasa Indonesia](id/PROTOCOL.md) · [Documentation index](INDEX.md) · [Language options](LANGUAGES.md)
+
 **Status:** initial design draft. Breaking changes are expected before the first stable release.
 
 The protocol separates the SAMP.AI Core from game-server runtimes. It is language-neutral and uses JSON in the first implementation. A future binary transport can reuse the same logical message model.

@@ -1,5 +1,7 @@
 # Native GTA World Objects and Undo/Redo
 
+> **Language:** [English](NATIVE_WORLD_OBJECTS.md) | [Bahasa Indonesia](id/NATIVE_WORLD_OBJECTS.md) · [Documentation index](INDEX.md) · [Language options](LANGUAGES.md)
+
 This document covers a special mapping case: changing objects that are part of the original GTA: San Andreas world, rather than objects created by the server.
 
 ## 1. Two different object lifecycles

@@ -1,5 +1,7 @@
 # Mapping Preview Editor Orchestration
 
+> **Language:** [English](MAPPING_PREVIEW_EDITOR.md) | [Bahasa Indonesia](id/MAPPING_PREVIEW_EDITOR.md) · [Documentation index](INDEX.md) · [Language options](LANGUAGES.md)
+
 ## Purpose
 
 `MappingPreviewEditOrchestrator` connects the Pawn preview editor to the core draft and approval workflow. It deliberately separates editing from publishing:
