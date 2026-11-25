@@ -67,7 +67,7 @@ test("Pawn adapter registers only its implemented read and mapping actions", () 
 });
 
 test("Pawn mapping action schema accepts a supported global object task and result", () => {
-  const { actions, schemas } = createPawnActionHarness();
+  const { actions, schemas, queue } = createPawnActionHarness();
   const create = actions.get("mapping.create_object");
 
   const payload = {
@@ -95,6 +95,27 @@ test("Pawn mapping action schema accepts a supported global object task and resu
   };
 
   schemas.assert(create.resultSchema, result, "Pawn mapping result");
+
+  // Verify the queue accepts the exact result shape emitted by the Pawn script.
+  const queued = queue.enqueue({
+    serverInstanceId: "pawn-server",
+    adapterId: "sampai-pawn",
+    actionId: "mapping.create_object",
+    idempotencyKey: "pawn-mapping-result-0001",
+    payload
+  });
+  const lease = queue.claimNext("pawn-server", "sampai-pawn");
+  assert.ok(lease);
+  assert.equal(lease.taskId, queued.taskId);
+
+  const completed = queue.complete(
+    "pawn-server",
+    "sampai-pawn",
+    lease.taskId,
+    lease.leaseToken,
+    { status: "succeeded", output: result }
+  );
+  assert.equal(completed.state, "succeeded");
 });
 
 test("Pawn context action and mapping tasks can be enqueued only for advertised capabilities", () => {
