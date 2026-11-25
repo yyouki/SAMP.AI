@@ -1,11 +1,34 @@
-import Ajv2020 from "ajv/dist/2020.js";
+import * as Ajv2020Module from "ajv/dist/2020.js";
 import type { AnySchema, ValidateFunction } from "ajv";
-import addFormats from "ajv-formats";
+import * as AjvFormatsModule from "ajv-formats";
 import { SchemaValidationError } from "../core/errors.js";
 import type { JsonSchema } from "../shared/contracts.js";
 
+interface Ajv2020Instance {
+  addSchema(schema: AnySchema): unknown;
+  getSchema(schema: string): ValidateFunction | undefined;
+  compile(schema: AnySchema): ValidateFunction;
+}
+
+type Ajv2020Constructor = new (options: {
+  allErrors: boolean;
+  strict: boolean;
+  validateFormats: boolean;
+}) => Ajv2020Instance;
+
+type AddFormats = (ajv: Ajv2020Instance) => unknown;
+
+// The package declarations resolve as namespaces under NodeNext; Node's CJS
+// interop exposes the runtime constructor/function on the default export.
+const Ajv2020 = (Ajv2020Module as unknown as {
+  default: Ajv2020Constructor;
+}).default;
+const addFormats = (AjvFormatsModule as unknown as {
+  default: AddFormats;
+}).default;
+
 export class JsonSchemaValidator {
-  private readonly ajv: Ajv2020;
+  private readonly ajv: Ajv2020Instance;
   private readonly compiled = new WeakMap<object, ValidateFunction>();
 
   constructor(schemas: readonly AnySchema[] = []) {
