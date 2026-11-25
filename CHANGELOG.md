@@ -4,6 +4,8 @@ Notable changes for each published SAMP.AI version.
 
 ## 0.1.0 — Initial release
 
+This release is versioned as v0.1.0, matching package.json.
+
 - Added the TypeScript core for tool registration/execution, schema validation, permissions, agent contracts, and provider integration.
 - Added the adapter framework, mock game adapter, task queue, authenticated HTTP gateway, and typed Pawn action contracts.
 - Added the reference Pawn filterscript for SA-MP and open.mp.
