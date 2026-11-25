@@ -19,7 +19,6 @@
 #define SAMP_AI_CONFIG_FILE "scriptfiles/samp_ai_adapter.json"
 #define SAMP_AI_MAX_BODY 8192
 #define SAMP_AI_MAX_CREATED_OBJECTS 400
-#define SAMP_AI_MAX_PREVIEW_PLAYERS MAX_PLAYERS
 #define SAMP_AI_POLL_MS 1500
 #define SAMP_AI_HEARTBEAT_MS 15000
 #define SAMP_AI_REQUEST_TIMEOUT_MS 10000
@@ -55,8 +54,34 @@ forward SampAI_PollTimer();
 forward SampAI_HeartbeatTimer();
 forward SampAI_OnHttpResponse(index, response[], status, error);
 
-stock SampAI_StartPlayerSession(playerid);
-stock SampAI_ClearPreviewForPlayer(playerid);
+stock SampAI_StartPlayerSession(playerid)
+{
+    g_SampAiSessionSequence++;
+    format(
+        g_SampAiPlayerSessionId[playerid],
+        sizeof(g_SampAiPlayerSessionId[]),
+        "p%d_%d_%d",
+        playerid,
+        GetTickCount(),
+        g_SampAiSessionSequence
+    );
+    g_SampAiPreviewObject[playerid] = INVALID_OBJECT_ID;
+    g_SampAiPreviewId[playerid][0] = EOS;
+    return 1;
+}
+
+stock SampAI_ClearPreviewForPlayer(playerid)
+{
+    new objectId = g_SampAiPreviewObject[playerid];
+    if (objectId != INVALID_OBJECT_ID && IsValidPlayerObject(playerid, objectId))
+    {
+        DestroyPlayerObject(playerid, objectId);
+    }
+
+    g_SampAiPreviewObject[playerid] = INVALID_OBJECT_ID;
+    g_SampAiPreviewId[playerid][0] = EOS;
+    return 1;
+}
 
 public OnFilterScriptInit()
 {
@@ -111,36 +136,6 @@ public OnPlayerDisconnect(playerid, reason)
     #pragma unused reason
     SampAI_ClearPreviewForPlayer(playerid);
     g_SampAiPlayerSessionId[playerid][0] = EOS;
-    return 1;
-}
-
-stock SampAI_StartPlayerSession(playerid)
-{
-    g_SampAiSessionSequence++;
-    format(
-        g_SampAiPlayerSessionId[playerid],
-        sizeof(g_SampAiPlayerSessionId[]),
-        "p%d_%d_%d",
-        playerid,
-        GetTickCount(),
-        g_SampAiSessionSequence
-    );
-    g_SampAiPreviewObject[playerid] = INVALID_OBJECT_ID;
-    g_SampAiPreviewId[playerid][0] = EOS;
-    return 1;
-}
-
-stock SampAI_ClearPreviewForPlayer(playerid)
-{
-    new objectId = g_SampAiPreviewObject[playerid];
-    if (objectId != INVALID_OBJECT_ID && IsPlayerConnected(playerid) &&
-        IsValidPlayerObject(playerid, objectId))
-    {
-        DestroyPlayerObject(playerid, objectId);
-    }
-
-    g_SampAiPreviewObject[playerid] = INVALID_OBJECT_ID;
-    g_SampAiPreviewId[playerid][0] = EOS;
     return 1;
 }
 
