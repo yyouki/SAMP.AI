@@ -135,8 +135,8 @@ compile_target() {
   echo "Built $output ($(stat -c '%s' "$output") bytes)"
 }
 
-# SAMP_COMPAT enables the legacy a_samp surface and untagged callback prototypes.
-compile_target "samp" "$INCLUDE_ROOT/openmp" "-DSAMP_COMPAT" "-DSAMP_AI_OPEN_MP" "-DSAMP_AI_OPEN_MP"
+# SAMP_COMPAT enables legacy native names; SAMP_AI_OPEN_MP selects the tagged editor callback prototype.
+compile_target "samp" "$INCLUDE_ROOT/openmp" "-DSAMP_COMPAT" "-DSAMP_AI_OPEN_MP"
 compile_target "openmp" "$INCLUDE_ROOT/openmp" "-DSAMP_AI_OPEN_MP"
 
 
