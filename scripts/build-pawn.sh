@@ -117,6 +117,10 @@ compile_target() {
   "$PAWNCC" \
     "-i$includes" \
     "-i$INCLUDE_ROOT" \
+    -DJSON_MAX_NODES=4096 \
+    -DJSON_MAX_VALUE_LEN=512 \
+    -DJSON_MAX_STRING_LEN=8192 \
+    -DJSON_SERIALIZE_BUFFER=8192 \
     -d0 \
     -O2 \
     -Z \
@@ -133,7 +137,7 @@ compile_target() {
 
 compile_target "samp" "$INCLUDE_ROOT/samp"
 # The official open.mp include package provides a_samp compatibility wrappers.
-compile_target "openmp" "$INCLUDE_ROOT/openmp" "-DSAMP_COMPAT"
+compile_target "openmp" "$INCLUDE_ROOT/openmp" "-DSAMP_COMPAT" "-DSAMP_AI_OPEN_MP"
 
 cat > "$OUTPUT_DIR/build-info.txt" <<EOF
 SAMP.AI Pawn build provenance

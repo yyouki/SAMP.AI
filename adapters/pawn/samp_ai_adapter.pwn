@@ -173,8 +173,13 @@ stock SampAI_StorePreviewTransform(playerid, Float:x, Float:y, Float:z, Float:rx
     return 1;
 }
 
+#if defined SAMP_AI_OPEN_MP
 public OnPlayerEditObject(playerid, playerobject, objectid, EDIT_RESPONSE:response,
     Float:x, Float:y, Float:z, Float:rx, Float:ry, Float:rz)
+#else
+public OnPlayerEditObject(playerid, playerobject, objectid, response,
+    Float:x, Float:y, Float:z, Float:rx, Float:ry, Float:rz)
+#endif
 {
     // Only consume callbacks for this filterscript's active player-object preview.
     if (playerid < 0 || playerid >= MAX_PLAYERS || !playerobject ||
@@ -185,14 +190,22 @@ public OnPlayerEditObject(playerid, playerobject, objectid, EDIT_RESPONSE:respon
         return 0;
     }
 
+#if defined SAMP_AI_OPEN_MP
     if (response == EDIT_RESPONSE_FINAL)
+#else
+    if (response == _:EDIT_RESPONSE_FINAL)
+#endif
     {
         SetPlayerObjectPos(playerid, objectid, x, y, z);
         SetPlayerObjectRot(playerid, objectid, rx, ry, rz);
         SampAI_StorePreviewTransform(playerid, x, y, z, rx, ry, rz);
         g_SampAiPreviewEditState[playerid] = 2;
     }
+#if defined SAMP_AI_OPEN_MP
     else if (response == EDIT_RESPONSE_CANCEL)
+#else
+    else if (response == _:EDIT_RESPONSE_CANCEL)
+#endif
     {
         // The GUI may have moved the object before cancel; restore the last accepted transform.
         SetPlayerObjectPos(
@@ -804,7 +817,7 @@ stock bool:SampAI_ExecuteTask(
 
     if (!strcmp(actionId, "mapping.get_player_preview_edit_result", true))
     {
-        new previewId[101], playerSessionId[101], state[24];
+        new previewId[101], playerSessionId[101], editStatus[24];
         new playerId;
         new bool:found = false;
         new Float:x, Float:y, Float:z, Float:rx, Float:ry, Float:rz;
@@ -835,22 +848,22 @@ stock bool:SampAI_ExecuteTask(
 
             switch (g_SampAiPreviewEditState[playerId])
             {
-                case 1: format(state, sizeof(state), "editing");
-                case 2: format(state, sizeof(state), "completed");
-                case 3: format(state, sizeof(state), "cancelled");
-                default: format(state, sizeof(state), "ready");
+                case 1: format(editStatus, sizeof(editStatus), "editing");
+                case 2: format(editStatus, sizeof(editStatus), "completed");
+                case 3: format(editStatus, sizeof(editStatus), "cancelled");
+                default: format(editStatus, sizeof(editStatus), "ready");
             }
         }
         else
         {
-            format(state, sizeof(state), "not_found");
+            format(editStatus, sizeof(editStatus), "not_found");
         }
 
         JSON_ObjectSetString(outputNode, "preview_id", previewId);
         JSON_ObjectSetInt(outputNode, "player_id", playerId);
         JSON_ObjectSetString(outputNode, "player_session_id", playerSessionId);
         JSON_ObjectSetBool(outputNode, "found", found);
-        JSON_ObjectSetString(outputNode, "status", state);
+        JSON_ObjectSetString(outputNode, "status", editStatus);
         SampAI_AddVector(documentId, outputNode, "position", x, y, z);
         SampAI_AddVector(documentId, outputNode, "rotation", rx, ry, rz);
         JSON_ObjectSetString(outputNode, "scope", "player");
