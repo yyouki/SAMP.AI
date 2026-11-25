@@ -133,7 +133,15 @@ const objectResultSchema = objectSchema({
   model_id: { type: "integer", minimum: 1, maximum: 65535 },
   runtime_object_id: { type: "integer", minimum: 0, maximum: 65535 },
   ...transformResultProperties
-});
+}, [
+  "object_id",
+  "project_id",
+  "model_id",
+  "position",
+  "rotation",
+  "interior_id",
+  "virtual_world_id"
+]);
 
 const anchorResultSchema = objectSchema({
   anchor_id: entityIdSchema,
