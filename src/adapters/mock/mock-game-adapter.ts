@@ -13,6 +13,7 @@ export interface MockVector3 {
 
 export interface MockPlayerState {
   readonly player_id: number;
+  readonly session_id: string;
   readonly position: MockVector3;
   readonly facing: number;
   readonly interior_id: number;
@@ -43,6 +44,18 @@ export interface MockMarker {
   readonly project_id: string;
   readonly position: MockVector3;
   readonly color: string;
+}
+
+export interface MockPlayerPreview {
+  readonly preview_id: string;
+  readonly project_id: string;
+  readonly player_id: number;
+  readonly player_session_id: string;
+  readonly runtime_object_id: number;
+  readonly model_id: number;
+  readonly position: MockVector3;
+  readonly rotation: MockVector3;
+  readonly scope: "player";
 }
 
 export interface MockNativeRemovalDirective {
@@ -156,15 +169,38 @@ const markerResultSchema = objectSchema({
   color: { type: "string", minLength: 1, maxLength: 32 }
 });
 
+const playerPreviewResultSchema = objectSchema({
+  preview_id: entityIdSchema,
+  project_id: projectIdSchema,
+  player_id: { type: "integer", minimum: 0, maximum: 1004 },
+  player_session_id: entityIdSchema,
+  runtime_object_id: { type: "integer", minimum: 0, maximum: 65535 },
+  model_id: { type: "integer", minimum: 1, maximum: 65535 },
+  position: vectorSchema,
+  rotation: vectorSchema,
+  scope: { const: "player" }
+});
+
+const clearPlayerPreviewResultSchema = objectSchema({
+  preview_id: entityIdSchema,
+  player_id: { type: "integer", minimum: 0, maximum: 1004 },
+  player_session_id: entityIdSchema,
+  cleared: { type: "boolean" },
+  scope: { const: "player" }
+});
+
 const resultSchemas: Record<string, JsonSchema> = {
   "context.get_player_state": objectSchema({
     player_id: { type: "integer", minimum: 0, maximum: 1004 },
     found: { type: "boolean" },
+    session_id: { type: "string", maxLength: 100 },
     position: vectorSchema,
     facing: { type: "number" },
     interior_id: { type: "integer", minimum: 0, maximum: 255 },
     virtual_world_id: integerIdSchema
-  }, ["player_id", "found"]),
+  }, ["player_id", "found", "session_id"]),
+  "mapping.preview_player_object": playerPreviewResultSchema,
+  "mapping.clear_player_preview": clearPlayerPreviewResultSchema,
   "anchor.create": anchorResultSchema,
   "anchor.list": objectSchema({
     project_id: projectIdSchema,
@@ -196,6 +232,26 @@ const resultSchemas: Record<string, JsonSchema> = {
   })
 };
 
+const previewPlayerObjectAction: AdapterActionDefinition = {
+  id: "mapping.preview_player_object",
+  description: "Create or replace one temporary object visible only to the target player session.",
+  requiredCapabilities: ["mapping.preview_player_object"],
+  effect: "mutate",
+  risk: "low",
+  idempotent: false,
+  compensation: "undo",
+  payloadSchema: objectSchema({
+    preview_id: entityIdSchema,
+    project_id: projectIdSchema,
+    player_id: { type: "integer", minimum: 0, maximum: 1004 },
+    player_session_id: entityIdSchema,
+    model_id: { type: "integer", minimum: 1, maximum: 65535 },
+    position: vectorSchema,
+    rotation: vectorSchema
+  }),
+  resultSchema: playerPreviewResultSchema
+};
+
 const definitions: AdapterActionDefinition[] = [
   action(
     "context.get_player_state",
@@ -206,6 +262,21 @@ const definitions: AdapterActionDefinition[] = [
     "none",
     objectSchema({ player_id: { type: "integer", minimum: 0, maximum: 1004 } }),
     resultSchemas["context.get_player_state"]!
+  ),
+  previewPlayerObjectAction,
+  action(
+    "mapping.clear_player_preview",
+    "Clear only the matching preview for the same player session.",
+    "mapping.clear_player_preview",
+    "delete",
+    "low",
+    "none",
+    objectSchema({
+      preview_id: entityIdSchema,
+      player_id: { type: "integer", minimum: 0, maximum: 1004 },
+      player_session_id: entityIdSchema
+    }),
+    resultSchemas["mapping.clear_player_preview"]!
   ),
   action(
     "anchor.create",
@@ -343,6 +414,8 @@ const definitions: AdapterActionDefinition[] = [
 
 export const MOCK_GAME_ADAPTER_CAPABILITIES = Object.freeze([
   "context.player_state",
+  "mapping.preview_player_object",
+  "mapping.clear_player_preview",
   "anchor.create",
   "anchor.list",
   "marker.create",
@@ -420,6 +493,8 @@ function asVector(value: unknown): MockVector3 {
  */
 export class MockGameAdapter {
   private readonly players = new Map<number, MockPlayerState>();
+  private readonly playerPreviews = new Map<number, MockPlayerPreview>();
+  private nextPreviewRuntimeId = 1;
   private readonly objects = new Map<string, MockGameObject>();
   private readonly anchors = new Map<string, MockAnchor>();
   private readonly markers = new Map<string, MockMarker>();
@@ -438,7 +513,30 @@ export class MockGameAdapter {
   }
 
   setPlayerState(state: MockPlayerState): void {
+    const prior = this.players.get(state.player_id);
+    if (prior && prior.session_id !== state.session_id) {
+      const activePreview = this.playerPreviews.get(state.player_id);
+      if (activePreview?.player_session_id === prior.session_id) {
+        this.playerPreviews.delete(state.player_id);
+      }
+    }
     this.players.set(state.player_id, Object.freeze(structuredClone(state)));
+  }
+
+  /** Simulate a disconnect; its private preview is automatically removed. */
+  disconnectPlayer(playerId: number): void {
+    const prior = this.players.get(playerId);
+    if (!prior) return;
+    const activePreview = this.playerPreviews.get(playerId);
+    if (activePreview?.player_session_id === prior.session_id) {
+      this.playerPreviews.delete(playerId);
+    }
+    this.players.delete(playerId);
+  }
+
+  getPlayerPreview(playerId: number): MockPlayerPreview | undefined {
+    const preview = this.playerPreviews.get(playerId);
+    return preview ? structuredClone(preview) : undefined;
   }
 
   /** Inject one deterministic failure for the next task with this action ID. */
@@ -530,7 +628,63 @@ export class MockGameAdapter {
       const player = this.players.get(playerId);
       return player
         ? { ...structuredClone(player), found: true }
-        : { player_id: playerId, found: false };
+        : { player_id: playerId, found: false, session_id: "" };
+    }
+
+    if (actionId === "mapping.preview_player_object") {
+      const playerId = payload.player_id as number;
+      const player = this.players.get(playerId);
+      const playerSessionId = payload.player_session_id as string;
+      if (!player || player.session_id !== playerSessionId) {
+        throw new SampAiError(
+          "Target player is offline or the connection session changed.",
+          "MOCK_PLAYER_SESSION_MISMATCH"
+        );
+      }
+
+      const preview: MockPlayerPreview = Object.freeze({
+        preview_id: payload.preview_id as string,
+        project_id: payload.project_id as string,
+        player_id: playerId,
+        player_session_id: playerSessionId,
+        runtime_object_id: this.nextPreviewRuntimeId++,
+        model_id: payload.model_id as number,
+        position: asVector(payload.position),
+        rotation: asVector(payload.rotation),
+        scope: "player"
+      });
+      this.playerPreviews.set(playerId, preview);
+      return structuredClone(preview);
+    }
+
+    if (actionId === "mapping.clear_player_preview") {
+      const playerId = payload.player_id as number;
+      const previewId = payload.preview_id as string;
+      const playerSessionId = payload.player_session_id as string;
+      const player = this.players.get(playerId);
+      const active = this.playerPreviews.get(playerId);
+      let cleared = false;
+
+      if (!player || player.session_id !== playerSessionId) {
+        // A disconnect or a new connection session cannot inherit the old preview.
+        cleared = true;
+      } else if (!active) {
+        cleared = true;
+      } else if (
+        active.preview_id === previewId &&
+        active.player_session_id === playerSessionId
+      ) {
+        this.playerPreviews.delete(playerId);
+        cleared = true;
+      }
+
+      return {
+        preview_id: previewId,
+        player_id: playerId,
+        player_session_id: playerSessionId,
+        cleared,
+        scope: "player"
+      };
     }
 
     if (actionId === "anchor.list") {
