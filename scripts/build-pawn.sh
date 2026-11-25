@@ -112,11 +112,21 @@ fi
 compile_target() {
   local target="$1"
   local includes="$2"
-  shift 2
+  local target_mode="$3"
   local target_dir="$OUTPUT_DIR/$target"
   local output="$target_dir/samp_ai_adapter.amx"
+  local generated_source="$BUILD_ROOT/$target-samp_ai_adapter.pwn"
 
   mkdir -p "$target_dir"
+  : > "$generated_source"
+  if [[ "$target_mode" == "samp" ]]; then
+    # These defines must be present before a_samp/open.mp includes are parsed.
+    printf '#define SAMP_COMPAT\\n#define SAMP_AI_OPEN_MP\\n' > "$generated_source"
+  else
+    printf '#define OPEN_MP_NO_WRAPPER_WARNING\\n#define SAMP_AI_OPEN_MP\\n' > "$generated_source"
+  fi
+  cat "$SOURCE" >> "$generated_source"
+
   echo "Compiling Pawn adapter for $target..."
   "$PAWNCC" \
     "-i$includes" \
@@ -124,9 +134,8 @@ compile_target() {
     -d0 \
     -O2 \
     -Z \
-    "$@" \
     "-o$output" \
-    "$SOURCE"
+    "$generated_source"
 
   if [[ ! -s "$output" ]]; then
     echo "::error::Compiler did not produce $output"
@@ -135,9 +144,10 @@ compile_target() {
   echo "Built $output ($(stat -c '%s' "$output") bytes)"
 }
 
-# SAMP_COMPAT enables legacy native names; SAMP_AI_OPEN_MP selects the tagged editor callback prototype.
-compile_target "samp" "$INCLUDE_ROOT/openmp" "-DSAMP_COMPAT" "-DSAMP_AI_OPEN_MP"
-compile_target "openmp" "$INCLUDE_ROOT/openmp" "-DSAMP_AI_OPEN_MP"
+# SA-MP uses the open.mp standard include package in legacy compatibility mode.
+# The temporary preamble selects the matching callback prototype before includes load.
+compile_target "samp" "$INCLUDE_ROOT/openmp" "samp"
+compile_target "openmp" "$INCLUDE_ROOT/openmp" "openmp"
 
 
 cat > "$OUTPUT_DIR/build-info.txt" <<EOF
