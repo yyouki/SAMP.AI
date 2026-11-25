@@ -23,6 +23,7 @@ This roadmap prioritizes a safe, testable end-to-end path before adding more ada
 - [ ] Add contract tests so every adapter must pass the same protocol suite.
 - [x] Add initial registry, permission, execution, and declarative extension-loader tests.
 - [x] Add mock-adapter task execution tests for mapping CRUD, context, anchors, markers, native directives, replay, and failures.
+- [x] Add Pawn action-contract tests for advertised capabilities, payload/result schemas, and non-idempotent mutation policy.
 
 **Exit condition:** a mock server can connect, advertise capabilities, receive a validated draft, and return deterministic execution results.
 
@@ -48,13 +49,14 @@ This roadmap prioritizes a safe, testable end-to-end path before adding more ada
 ## Phase 3 — First open.mp adapter (Pawn)
 - [x] Add authenticated HTTP task claim, lease renewal, and result submission routes.
 - [ ] Implement durable task storage and worker-side task deduplication.
-- [ ] Implement adapter task/action dispatch over the authenticated gateway.
-- [ ] Connect a real Pawn adapter to the HTTP gateway.
-- [ ] Report server/runtime metadata and capabilities.
-- [ ] Capture player position and facing direction where available.
+- [x] Add a Pawn reference filterscript for authenticated hello, task polling, heartbeat, result submission, player-state reads, and global object creation (runtime compilation/live validation remains open).
+- [ ] Compile and connect the Pawn reference adapter to a real SA-MP/open.mp server with the documented HTTPS/JSON dependencies.
+- [x] Report server/runtime metadata and the two implemented capabilities in the Pawn handshake.
+- [x] Capture online player position, facing direction, interior, and virtual-world context in the Pawn reference adapter.
 - [ ] Capture interior and virtual-world context where available.
 - [ ] Create and clean up private preview markers.
-- [ ] Implement bounded object creation / deletion queues.
+- [ ] Implement production-grade bounded object creation / deletion queues.
+- [x] Add a first bounded Pawn global-object create action for interior 0 / virtual world 0.
 - [ ] Implement per-player native-world removal directives with session deduplication.
 - [ ] Return per-operation and per-player-session results.
 
