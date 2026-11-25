@@ -81,18 +81,19 @@ download "https://raw.githubusercontent.com/NimaBastani/pawn-json-parser/$JSON_P
 # inside the include itself so it is available regardless of include order.
 PARSER_PATCHED="$DOWNLOAD_DIR/json_parser.patched.inc"
 awk '
-  /^#if !defined JSON_MAX_NODES$/ {
-    print "#define JSON_MAX_NODES 4096"
-    skip = 1
-    next
+  /#if !defined JSON_MAX_NODES/ { skip = 1; next }
+  skip && /#endif/ { skip = 0; next }
+  !skip {
+    gsub(/JSON_MAX_NODES/, "4096")
+    print
   }
-  skip && /^#endif$/ {
-    skip = 0
-    next
-  }
-  !skip { print }
 ' "$INCLUDE_ROOT/json_parser.inc" > "$PARSER_PATCHED"
 mv "$PARSER_PATCHED" "$INCLUDE_ROOT/json_parser.inc"
+if grep -q "JSON_MAX_NODES" "$INCLUDE_ROOT/json_parser.inc"; then
+  echo "::error::Failed to patch JSON_MAX_NODES in the pinned JSON parser."
+  exit 1
+fi
+echo "Patched JSON parser node pool to 4096 entries."
 
 echo "Preparing open.mp standard includes and SA-MP compatibility mode..."
 OMP_INCLUDE="$BUILD_ROOT/includes-openmp"
@@ -135,7 +136,7 @@ compile_target() {
 }
 
 # SAMP_COMPAT enables the legacy a_samp surface and untagged callback prototypes.
-compile_target "samp" "$INCLUDE_ROOT/openmp" "-DSAMP_COMPAT"
+compile_target "samp" "$INCLUDE_ROOT/openmp" "-DSAMP_COMPAT" "-DSAMP_AI_OPEN_MP"
 compile_target "openmp" "$INCLUDE_ROOT/openmp" "-DSAMP_AI_OPEN_MP"
 
 
