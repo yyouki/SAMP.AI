@@ -12,6 +12,7 @@ export * from "./adapters/adapter-task-queue.js";
 export * from "./adapters/bearer-adapter-authenticator.js";
 export * from "./protocol/http-adapter-gateway.js";
 export * from "./adapters/mock/register-mock-tools.js";
+export * from "./adapters/mock/mock-game-adapter.js";
 export * from "./extensions/extension-loader.js";
 export * from "./extensions/skill-registry.js";
 export * from "./extensions/skill-tool-dispatcher.js";
