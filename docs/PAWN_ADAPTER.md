@@ -85,6 +85,46 @@ taskQueue.enqueue({
   payload: { player_id: 7 }
 });
 
+// First request the target player's current state and connection session.
+taskQueue.enqueue({
+  serverInstanceId: "your-server-instance-id",
+  adapterId: "sampai-pawn",
+  actionId: "context.get_player_state",
+  idempotencyKey: "reviewer-state-0001",
+  payload: { player_id: 7 }
+});
+
+// After the context result reports found=true, use its session_id to bind the preview.
+// Do not guess or cache a player session ID across reconnects.
+taskQueue.enqueue({
+  serverInstanceId: "your-server-instance-id",
+  adapterId: "sampai-pawn",
+  actionId: "mapping.preview_player_object",
+  idempotencyKey: "hospital-preview-0001",
+  payload: {
+    preview_id: "hospital-preview-wall-01",
+    project_id: "hospital",
+    player_id: 7,
+    player_session_id: "<session_id from context.get_player_state>",
+    model_id: 19377,
+    position: { x: 100, y: 200, z: 5 },
+    rotation: { x: 0, y: 0, z: 90 }
+  }
+});
+
+// Clear only this exact preview for the same connection session.
+taskQueue.enqueue({
+  serverInstanceId: "your-server-instance-id",
+  adapterId: "sampai-pawn",
+  actionId: "mapping.clear_player_preview",
+  idempotencyKey: "hospital-preview-clear-0001",
+  payload: {
+    preview_id: "hospital-preview-wall-01",
+    player_id: 7,
+    player_session_id: "<same session_id>"
+  }
+});
+
 taskQueue.enqueue({
   serverInstanceId: "your-server-instance-id",
   adapterId: "sampai-pawn",
