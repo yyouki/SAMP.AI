@@ -56,9 +56,9 @@ const createObjectAction: AdapterActionDefinition = {
     type: "object",
     additionalProperties: false,
     properties: {
-      operation_id: { type: "string", minLength: 8, maxLength: 128 },
-      object_id: { type: "string", minLength: 1, maxLength: 100 },
-      project_id: { type: "string", minLength: 1, maxLength: 100 },
+      operation_id: { type: "string", minLength: 8, maxLength: 128, pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$" },
+      object_id: { type: "string", minLength: 1, maxLength: 100, pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$" },
+      project_id: { type: "string", minLength: 1, maxLength: 100, pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$" },
       model_id: { type: "integer", minimum: 1, maximum: 65535 },
       position: vectorSchema,
       rotation: vectorSchema,
