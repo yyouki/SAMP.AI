@@ -86,7 +86,7 @@ function parseTaskResult(value: unknown): AdapterTaskResult {
 }
 
 export class HttpAdapterGateway {
-  private server?: Server;
+  private server: Server | undefined;
 
   constructor(
     private readonly adapters: AdapterRegistry,
