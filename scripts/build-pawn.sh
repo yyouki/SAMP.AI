@@ -79,7 +79,20 @@ echo "$HTTPS_SAMP_SHA256  $INCLUDE_ROOT/https_samp.inc" | sha256sum --check --st
 download "https://raw.githubusercontent.com/NimaBastani/pawn-json-parser/$JSON_PARSER_SHA/json_parser.inc" "$INCLUDE_ROOT/json_parser.inc"
 # The parser references this pool limit in its static node table. Define it
 # inside the include itself so it is available regardless of include order.
-sed -i '/^#if !defined JSON_MAX_NODES$/,/^#endif$/c\\#define JSON_MAX_NODES 4096' "$INCLUDE_ROOT/json_parser.inc"
+PARSER_PATCHED="$DOWNLOAD_DIR/json_parser.patched.inc"
+awk '
+  /^#if !defined JSON_MAX_NODES$/ {
+    print "#define JSON_MAX_NODES 4096"
+    skip = 1
+    next
+  }
+  skip && /^#endif$/ {
+    skip = 0
+    next
+  }
+  !skip { print }
+' "$INCLUDE_ROOT/json_parser.inc" > "$PARSER_PATCHED"
+mv "$PARSER_PATCHED" "$INCLUDE_ROOT/json_parser.inc"
 
 echo "Preparing open.mp standard includes and SA-MP compatibility mode..."
 OMP_INCLUDE="$BUILD_ROOT/includes-openmp"
@@ -88,10 +101,6 @@ mkdir -p "$INCLUDE_ROOT/openmp"
 cp "$OMP_INCLUDE"/*.inc "$INCLUDE_ROOT/openmp/"
 cp "$INCLUDE_ROOT/https_samp.inc" "$INCLUDE_ROOT/openmp/"
 cp "$INCLUDE_ROOT/json_parser.inc" "$INCLUDE_ROOT/openmp/"
-
-# SAMP_COMPAT enables the legacy a_samp surface and untagged callback prototypes.
-compile_target "samp" "$INCLUDE_ROOT/openmp" "-DSAMP_COMPAT"
-compile_target "openmp" "$INCLUDE_ROOT/openmp" "-DSAMP_AI_OPEN_MP"
 
 SOURCE="$ROOT_DIR/adapters/pawn/samp_ai_adapter.pwn"
 if [[ ! -f "$SOURCE" ]]; then
@@ -111,10 +120,6 @@ compile_target() {
   "$PAWNCC" \
     "-i$includes" \
     "-i$INCLUDE_ROOT" \
-    -DJSON_MAX_NODES=4096 \
-    -DJSON_MAX_VALUE_LEN=512 \
-    -DJSON_MAX_STRING_LEN=8192 \
-    -DJSON_SERIALIZE_BUFFER=8192 \
     -d0 \
     -O2 \
     -Z \
@@ -128,6 +133,10 @@ compile_target() {
   fi
   echo "Built $output ($(stat -c '%s' "$output") bytes)"
 }
+
+# SAMP_COMPAT enables the legacy a_samp surface and untagged callback prototypes.
+compile_target "samp" "$INCLUDE_ROOT/openmp" "-DSAMP_COMPAT"
+compile_target "openmp" "$INCLUDE_ROOT/openmp" "-DSAMP_AI_OPEN_MP"
 
 
 cat > "$OUTPUT_DIR/build-info.txt" <<EOF

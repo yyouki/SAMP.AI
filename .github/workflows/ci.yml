@@ -98,7 +98,7 @@ jobs:
           RELEASE_COMMIT: ${{ github.sha }}
         run: |
           set -Eeuo pipefail
-          STAGE="$RUNNER_TEMP/release-stage"
+          STAGE="$GITHUB_WORKSPACE/release-stage"
           mkdir -p "$STAGE/samp-ai/adapters/pawn/source" "$STAGE/samp-ai/docs"
 
           cp package.json "$STAGE/samp-ai/"
