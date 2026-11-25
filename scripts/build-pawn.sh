@@ -58,8 +58,22 @@ if [[ -z "$PAWNCC" ]]; then
   exit 1
 fi
 chmod +x "$PAWNCC"
+PAWNCC_DIR="$(dirname "$PAWNCC")"
+PAWN_LIB_FILE="$(find "$TOOLCHAIN_DIR" -type f -name libpawnc.so -print -quit)"
+if [[ -z "$PAWN_LIB_FILE" ]]; then
+  echo "::error::libpawnc.so was not found inside the official compiler archive."
+  find "$TOOLCHAIN_DIR" -maxdepth 5 -type f -print
+  exit 1
+fi
+PAWN_LIB_DIR="$(dirname "$PAWN_LIB_FILE")"
+export LD_LIBRARY_PATH="$PAWN_LIB_DIR:$PAWNCC_DIR:${LD_LIBRARY_PATH:-}"
+if ldd "$PAWNCC" | grep -q "not found"; then
+  echo "::error::The Pawn compiler still has unresolved shared-library dependencies."
+  ldd "$PAWNCC"
+  exit 1
+fi
 echo "Using compiler: $PAWNCC"
-"$PAWNCC" 2>&1 | head -n 12 || true
+echo "Using compiler libraries: $PAWN_LIB_DIR"
 
 echo "Downloading pinned HTTPS and JSON Pawn includes..."
 download "$HTTPS_SAMP_URL" "$INCLUDE_ROOT/https_samp.inc"
