@@ -84,6 +84,7 @@ The filterscript advertises six capabilities/actions:
 ## Validation status and limitations
 
 - CI validates TypeScript type-checking, unit tests, and TypeScript build.
+- Latest verified CI for the interactive preview-editor implementation: [run #45623852494](https://github.com/yyouki/SAMP.AI/actions/runs/45623852494), commit `bf3064878975e370de89f8ffddb09372268e926a` — type-check succeeded, 57 tests passed / 0 failed, and build succeeded.
 - Pawn contract tests validate the TypeScript schemas and task queue behavior; they do not compile Pawn.
 - The Pawn filterscript has **not** been compiled against a real SA-MP/open.mp server include set or live-tested with `https_samp` and `pawn-json-parser`. Treat it as a reference implementation only.
 - No production authenticator, persistent queue/database, durable operation dedupe, signed approval receipt store, recoverable object index, or installer is complete.
