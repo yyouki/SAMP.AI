@@ -182,7 +182,7 @@ function createApproval(
     toolId: MAPPING_APPLY_APPROVAL_TOOL_ID,
     draftHash,
     serverInstanceId: context.serverInstanceId,
-    projectId: context.projectId,
+    ...(context.projectId ? { projectId: context.projectId } : {}),
     issuedAt: new Date().toISOString(),
     signature: "test-signature-from-approval-service"
   };
