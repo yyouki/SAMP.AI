@@ -4,7 +4,7 @@
 
 SAMP.AI is intended to help server owners and developers design, inspect, preview, and manage in-game content such as map objects and TextDraw interfaces. It is designed as a collaborative assistant: it can propose ideas proactively, but it must discuss uncertain requirements and obtain the required approval before applying changes.
 
-**Project status: Early core scaffold.** The repository contains TypeScript core primitives, protocol/extension schemas, adapter and skill registries, a declarative extension loader, a bounded provider-neutral agent loop, and an optional OpenAI Responses API provider. An in-memory typed adapter task queue is included, but a live open.mp adapter, durable queue/persistent storage, production authentication/approval services, and runtime installer are not implemented yet.
+**Project status: Early core scaffold.** The repository contains TypeScript core primitives, protocol/extension schemas, adapter and skill registries, a declarative extension loader, a bounded provider-neutral agent loop, and an optional OpenAI Responses API provider. An in-memory typed adapter task queue and deterministic Mock Game Adapter are included for end-to-end local simulation. A live open.mp adapter, durable queue/persistent storage, production authentication/approval services, and runtime installer are not implemented yet.
 
 ## Project goals
 
@@ -51,7 +51,7 @@ See [Provider setup](docs/PROVIDERS.md).
 
 The standalone core is initially implemented in TypeScript on Node.js 22 or later. This does not constrain game-mode languages: server integrations remain independent adapters using the versioned protocol.
 
-See [Core Implementation](docs/CORE_IMPLEMENTATION.md) for setup and implementation boundaries. Continuous integration runs type-checking, tests, and the TypeScript build on Node.js 22.
+See [Core Implementation](docs/CORE_IMPLEMENTATION.md) for setup and implementation boundaries. The [Mock Game Adapter](docs/MOCK_GAME_ADAPTER.md) guide explains how to run deterministic mapping and world-context simulations. Continuous integration runs type-checking, tests, and the TypeScript build on Node.js 22.
 
 ## High-level architecture
 
@@ -70,6 +70,12 @@ Game server / editor adapter
 ```
 
 The AI core must not depend on Pawn. Adapters expose capabilities and translate protocol operations into the host environment. The core must only use capabilities that an adapter advertises.
+
+## Local adapter simulation
+
+The Mock Game Adapter processes the same typed task queue used by real adapters. It simulates player state, anchors, review markers, server-created mapping objects, and per-player native-world removal directives. It is intended for deterministic tests and local development only; it does not connect to a running SA-MP/open.mp server. Native-world removal is recorded as a simulated directive and is never represented as a real removal.
+
+See [Mock Game Adapter](docs/MOCK_GAME_ADAPTER.md).
 
 ## Coordinate accuracy
 
