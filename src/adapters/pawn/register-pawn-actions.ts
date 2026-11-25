@@ -36,8 +36,8 @@ const playerStateAction: AdapterActionDefinition = {
       found: { type: "boolean" },
       position: vectorSchema,
       facing: { type: "number", minimum: 0, maximum: 360 },
-      interior_id: { type: "integer", minimum: 0, maximum: 255 },
-      virtual_world_id: { type: "integer", minimum: 0, maximum: 2147483647 }
+      interior_id: { const: 0, description: "Only the default interior request is accepted; the created object remains global." },
+      virtual_world_id: { const: 0, description: "Only the default virtual-world request is accepted; the created object remains global." }
     },
     required: ["player_id", "found"]
   }
@@ -87,8 +87,8 @@ const createObjectAction: AdapterActionDefinition = {
       position: vectorSchema,
       rotation: vectorSchema,
       scope: { const: "global" },
-      requested_interior_id: { type: "integer", minimum: 0, maximum: 255 },
-      requested_virtual_world_id: { type: "integer", minimum: 0, maximum: 2147483647 }
+      requested_interior_id: { const: 0 },
+      requested_virtual_world_id: { const: 0 }
     },
     required: [
       "object_id",
