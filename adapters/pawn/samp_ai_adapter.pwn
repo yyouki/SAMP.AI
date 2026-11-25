@@ -2,8 +2,8 @@
  * SAMP.AI Pawn reference adapter.
  *
  * Requires the external https_samp transport plugin and json_parser include.
- * This sample intentionally implements only player-state reads and global
- * CreateObject operations in interior 0 / virtual world 0.
+ * This reference sample implements player-state reads, global mapping objects,
+ * and a single session-bound preview object per player.
  */
 
 #include <a_samp>
@@ -19,6 +19,7 @@
 #define SAMP_AI_CONFIG_FILE "scriptfiles/samp_ai_adapter.json"
 #define SAMP_AI_MAX_BODY 8192
 #define SAMP_AI_MAX_CREATED_OBJECTS 400
+#define SAMP_AI_MAX_PREVIEW_PLAYERS MAX_PLAYERS
 #define SAMP_AI_POLL_MS 1500
 #define SAMP_AI_HEARTBEAT_MS 15000
 #define SAMP_AI_REQUEST_TIMEOUT_MS 10000
@@ -45,15 +46,31 @@ new g_SampAiHeartbeatTimer = -1;
 new g_SampAiTaskId[64];
 new g_SampAiLeaseToken[128];
 new g_SampAiCreatedObjectCount;
+new g_SampAiPreviewObject[MAX_PLAYERS];
+new g_SampAiPreviewId[MAX_PLAYERS][101];
+new g_SampAiPlayerSessionId[MAX_PLAYERS][101];
+new g_SampAiSessionSequence;
 
 forward SampAI_PollTimer();
 forward SampAI_HeartbeatTimer();
 forward SampAI_OnHttpResponse(index, response[], status, error);
 
+stock SampAI_StartPlayerSession(playerid);
+stock SampAI_ClearPreviewForPlayer(playerid);
+
 public OnFilterScriptInit()
 {
     JSON_Init();
     https_set_max_body_bytes(SAMP_AI_MAX_BODY);
+
+    // Initialize session-bound preview state for players already online.
+    for (new playerid = 0; playerid < MAX_PLAYERS; playerid++)
+    {
+        g_SampAiPreviewObject[playerid] = INVALID_OBJECT_ID;
+        g_SampAiPreviewId[playerid][0] = EOS;
+        g_SampAiPlayerSessionId[playerid][0] = EOS;
+        if (IsPlayerConnected(playerid)) SampAI_StartPlayerSession(playerid);
+    }
 
     if (!SampAI_LoadConfig())
     {
@@ -71,9 +88,59 @@ public OnFilterScriptExit()
     if (g_SampAiPollTimer != -1) KillTimer(g_SampAiPollTimer);
     if (g_SampAiHeartbeatTimer != -1) KillTimer(g_SampAiHeartbeatTimer);
 
-    // Do not destroy successfully-created world objects when the adapter unloads.
+    // Remove private preview objects when the filterscript unloads.
+    for (new playerid = 0; playerid < MAX_PLAYERS; playerid++)
+    {
+        if (IsPlayerConnected(playerid)) SampAI_ClearPreviewForPlayer(playerid);
+    }
+
+    // Do not destroy successfully-created global mapping objects when the adapter unloads.
     // Their lifecycle is owned by the server; this sample has no durable object index.
     print("[SAMP.AI] Pawn adapter stopped. Review any in-flight task before restarting.");
+    return 1;
+}
+
+public OnPlayerConnect(playerid)
+{
+    SampAI_StartPlayerSession(playerid);
+    return 1;
+}
+
+public OnPlayerDisconnect(playerid, reason)
+{
+    #pragma unused reason
+    SampAI_ClearPreviewForPlayer(playerid);
+    g_SampAiPlayerSessionId[playerid][0] = EOS;
+    return 1;
+}
+
+stock SampAI_StartPlayerSession(playerid)
+{
+    g_SampAiSessionSequence++;
+    format(
+        g_SampAiPlayerSessionId[playerid],
+        sizeof(g_SampAiPlayerSessionId[]),
+        "p%d_%d_%d",
+        playerid,
+        GetTickCount(),
+        g_SampAiSessionSequence
+    );
+    g_SampAiPreviewObject[playerid] = INVALID_OBJECT_ID;
+    g_SampAiPreviewId[playerid][0] = EOS;
+    return 1;
+}
+
+stock SampAI_ClearPreviewForPlayer(playerid)
+{
+    new objectId = g_SampAiPreviewObject[playerid];
+    if (objectId != INVALID_OBJECT_ID && IsPlayerConnected(playerid) &&
+        IsValidPlayerObject(playerid, objectId))
+    {
+        DestroyPlayerObject(playerid, objectId);
+    }
+
+    g_SampAiPreviewObject[playerid] = INVALID_OBJECT_ID;
+    g_SampAiPreviewId[playerid][0] = EOS;
     return 1;
 }
 
@@ -155,6 +222,8 @@ stock SampAI_BuildHello(body[], maxlen)
     // Advertise only actions that this reference script actually dispatches.
     JSON_ArrayAppendString(capabilities, "context.player_state");
     JSON_ArrayAppendString(capabilities, "mapping.create_object");
+    JSON_ArrayAppendString(capabilities, "mapping.preview_player_object");
+    JSON_ArrayAppendString(capabilities, "mapping.clear_player_preview");
 
     JSON_ObjectSetInt(limits, "max_operations_per_batch", 1);
     JSON_ObjectSetInt(limits, "max_objects_per_project", SAMP_AI_MAX_CREATED_OBJECTS);
@@ -451,14 +520,17 @@ stock bool:SampAI_ExecuteTask(
         if (!IsPlayerConnected(playerId))
         {
             JSON_ObjectSetBool(outputNode, "found", false);
+            JSON_ObjectSetString(outputNode, "session_id", "");
             return true;
         }
+
+        JSON_ObjectSetBool(outputNode, "found", true);
+        JSON_ObjectSetString(outputNode, "session_id", g_SampAiPlayerSessionId[playerId]);
 
         new Float:x, Float:y, Float:z, Float:facing;
         GetPlayerPos(playerId, x, y, z);
         GetPlayerFacingAngle(playerId, facing);
 
-        JSON_ObjectSetBool(outputNode, "found", true);
         SampAI_AddVector(documentId, outputNode, "position", x, y, z);
         JSON_ObjectSetFloat(outputNode, "facing", facing);
         JSON_ObjectSetInt(outputNode, "interior_id", GetPlayerInterior(playerId));
@@ -530,6 +602,114 @@ stock bool:SampAI_ExecuteTask(
         JSON_ObjectSetInt(outputNode, "requested_interior_id", interiorId);
         JSON_ObjectSetInt(outputNode, "requested_virtual_world_id", virtualWorldId);
         JSON_ObjectSetInt(outputNode, "runtime_object_id", nativeObjectId);
+        return true;
+    }
+
+    if (!strcmp(actionId, "mapping.preview_player_object", true))
+    {
+        new previewId[101], projectId[101], playerSessionId[101];
+        new playerId, modelId;
+        new Float:x, Float:y, Float:z, Float:rx, Float:ry, Float:rz;
+
+        if (!JSON_GetStringByPath(payloadNode, "preview_id", previewId, sizeof(previewId)) ||
+            !JSON_GetStringByPath(payloadNode, "project_id", projectId, sizeof(projectId)) ||
+            !JSON_GetStringByPath(payloadNode, "player_session_id", playerSessionId, sizeof(playerSessionId)) ||
+            !JSON_GetIntByPath(payloadNode, "player_id", playerId) ||
+            !JSON_GetIntByPath(payloadNode, "model_id", modelId) ||
+            !SampAI_ReadVector(payloadNode, "position", x, y, z) ||
+            !SampAI_ReadVector(payloadNode, "rotation", rx, ry, rz))
+        {
+            format(errorCode, errorCodeSize, "PREVIEW_PAYLOAD_INVALID");
+            format(errorMessage, errorMessageSize, "The player preview payload is incomplete.");
+            return false;
+        }
+
+        if (playerId < 0 || playerId >= MAX_PLAYERS ||
+            !IsPlayerConnected(playerId) ||
+            strcmp(playerSessionId, g_SampAiPlayerSessionId[playerId], false) != 0)
+        {
+            format(errorCode, errorCodeSize, "PLAYER_SESSION_MISMATCH");
+            format(errorMessage, errorMessageSize, "The target player is offline or the connection session has changed.");
+            return false;
+        }
+
+        if (!strlen(previewId) || !strlen(projectId) || modelId < 1 || modelId > 65535)
+        {
+            format(errorCode, errorCodeSize, "PREVIEW_VALUE_INVALID");
+            format(errorMessage, errorMessageSize, "Preview identity or model_id is outside the supported range.");
+            return false;
+        }
+
+        // Create first. If allocation fails, keep the existing preview intact.
+        new nativeObjectId = CreatePlayerObject(
+            playerId,
+            modelId,
+            x, y, z,
+            rx, ry, rz
+        );
+
+        if (nativeObjectId == INVALID_OBJECT_ID)
+        {
+            format(errorCode, errorCodeSize, "PLAYER_PREVIEW_CREATE_FAILED");
+            format(errorMessage, errorMessageSize, "CreatePlayerObject failed; the player's object pool may be full.");
+            return false;
+        }
+
+        // Each reviewer has at most one preview. Replace only after the new object exists.
+        SampAI_ClearPreviewForPlayer(playerId);
+        g_SampAiPreviewObject[playerId] = nativeObjectId;
+        format(g_SampAiPreviewId[playerId], sizeof(g_SampAiPreviewId[]), "%s", previewId);
+
+        JSON_ObjectSetString(outputNode, "preview_id", previewId);
+        JSON_ObjectSetString(outputNode, "project_id", projectId);
+        JSON_ObjectSetInt(outputNode, "player_id", playerId);
+        JSON_ObjectSetString(outputNode, "player_session_id", playerSessionId);
+        JSON_ObjectSetInt(outputNode, "runtime_object_id", nativeObjectId);
+        JSON_ObjectSetInt(outputNode, "model_id", modelId);
+        SampAI_AddVector(documentId, outputNode, "position", x, y, z);
+        SampAI_AddVector(documentId, outputNode, "rotation", rx, ry, rz);
+        JSON_ObjectSetString(outputNode, "scope", "player");
+        return true;
+    }
+
+    if (!strcmp(actionId, "mapping.clear_player_preview", true))
+    {
+        new previewId[101], playerSessionId[101];
+        new playerId;
+
+        if (!JSON_GetStringByPath(payloadNode, "preview_id", previewId, sizeof(previewId)) ||
+            !JSON_GetStringByPath(payloadNode, "player_session_id", playerSessionId, sizeof(playerSessionId)) ||
+            !JSON_GetIntByPath(payloadNode, "player_id", playerId) ||
+            playerId < 0 || playerId >= MAX_PLAYERS)
+        {
+            format(errorCode, errorCodeSize, "PREVIEW_CLEAR_PAYLOAD_INVALID");
+            format(errorMessage, errorMessageSize, "The preview clear payload is incomplete or player_id is invalid.");
+            return false;
+        }
+
+        new bool:cleared = false;
+        if (IsPlayerConnected(playerId) &&
+            !strcmp(playerSessionId, g_SampAiPlayerSessionId[playerId], false))
+        {
+            // Never let an old clear task delete a newer preview.
+            if (g_SampAiPreviewId[playerId][0] == EOS ||
+                !strcmp(previewId, g_SampAiPreviewId[playerId], false))
+            {
+                SampAI_ClearPreviewForPlayer(playerId);
+                cleared = true;
+            }
+        }
+        else
+        {
+            // Disconnect cleanup destroys the old session's player objects.
+            cleared = true;
+        }
+
+        JSON_ObjectSetString(outputNode, "preview_id", previewId);
+        JSON_ObjectSetInt(outputNode, "player_id", playerId);
+        JSON_ObjectSetString(outputNode, "player_session_id", playerSessionId);
+        JSON_ObjectSetBool(outputNode, "cleared", cleared);
+        JSON_ObjectSetString(outputNode, "scope", "player");
         return true;
     }
 
