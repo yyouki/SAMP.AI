@@ -33,6 +33,7 @@ new g_SampAiToken[256];
 new g_SampAiServerId[128];
 new g_SampAiAdapterId[80];
 new g_SampAiRuntime[32];
+new bool:g_SampAiClockIsUtc;
 
 new bool:g_SampAiReady;
 new bool:g_SampAiPollPending;
@@ -91,16 +92,18 @@ stock bool:SampAI_LoadConfig()
         JSON_GetStringByPath(root, "adapter_token", g_SampAiToken, sizeof(g_SampAiToken)) &&
         JSON_GetStringByPath(root, "server_instance_id", g_SampAiServerId, sizeof(g_SampAiServerId)) &&
         JSON_GetStringByPath(root, "adapter_id", g_SampAiAdapterId, sizeof(g_SampAiAdapterId)) &&
-        JSON_GetStringByPath(root, "runtime", g_SampAiRuntime, sizeof(g_SampAiRuntime));
+        JSON_GetStringByPath(root, "runtime", g_SampAiRuntime, sizeof(g_SampAiRuntime)) &&
+        JSON_GetBoolByPath(root, "server_clock_is_utc", g_SampAiClockIsUtc);
 
     JSON_DestroyDocument(documentId);
 
     if (!valid ||
+        !g_SampAiClockIsUtc ||
         !strlen(g_SampAiToken) ||
         !strlen(g_SampAiServerId) ||
         !strlen(g_SampAiAdapterId))
     {
-        print("[SAMP.AI] Config is missing a required value.");
+        print("[SAMP.AI] Config is missing a required value or server_clock_is_utc is not true.");
         return false;
     }
 
@@ -370,7 +373,14 @@ stock SampAI_HandleTask(const response[])
     );
 
     JSON_ObjectSetString(resultRoot, "lease_token", g_SampAiLeaseToken);
-    JSON_ObjectSetString(resultNode, "status", succeeded ? "succeeded" : "failed");
+    if (succeeded)
+    {
+        JSON_ObjectSetString(resultNode, "status", "succeeded");
+    }
+    else
+    {
+        JSON_ObjectSetString(resultNode, "status", "failed");
+    }
 
     if (succeeded)
     {
