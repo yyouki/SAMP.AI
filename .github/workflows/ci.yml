@@ -61,20 +61,28 @@ jobs:
 
       - name: Compile both Pawn targets
         env:
-          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SHA: \${{ github.sha }}
         run: bash scripts/build-pawn.sh "$RUNNER_TEMP/samp-ai-pawn-artifacts"
 
       - name: Upload Pawn build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: samp-ai-pawn-build
-          path: ${{ runner.temp }}/samp-ai-pawn-artifacts/
+          path: \${{ runner.temp }}/samp-ai-pawn-artifacts/
           if-no-files-found: error
           retention-days: 30
 
   publish-release:
     name: Package and publish GitHub Release
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: >-
+      github.event_name == 'push' &&
+      (
+        startsWith(github.ref, 'refs/tags/v') ||
+        (
+          github.ref == 'refs/heads/main' &&
+          startsWith(github.event.head_commit.message, 'release: v')
+        )
+      )
     needs: [validate, build-pawn]
     runs-on: ubuntu-latest
     permissions:
@@ -82,6 +90,30 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Resolve and verify release version
+        id: release
+        env:
+          RELEASE_COMMIT_MESSAGE: \${{ github.event.head_commit.message }}
+        run: |
+          set -Eeuo pipefail
+
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version="$GITHUB_REF_NAME"
+          elif [[ "$GITHUB_REF" == "refs/heads/main" && "$RELEASE_COMMIT_MESSAGE" =~ ^release:\ (v[0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            version="\${BASH_REMATCH[1]}"
+          else
+            echo "Release trigger must be a vX.Y.Z tag or a 'release: vX.Y.Z' commit on main." >&2
+            exit 1
+          fi
+
+          package_version="$(node -p "JSON.parse(require('fs').readFileSync('package.json', 'utf8')).version")"
+          if [[ "$version" != "v$package_version" ]]; then
+            echo "Release tag $version does not match package.json version $package_version." >&2
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Download TypeScript build
         uses: actions/download-artifact@v4
@@ -97,8 +129,8 @@ jobs:
 
       - name: Assemble release packages
         env:
-          RELEASE_VERSION: ${{ github.ref_name }}
-          RELEASE_COMMIT: ${{ github.sha }}
+          RELEASE_VERSION: \${{ steps.release.outputs.version }}
+          RELEASE_COMMIT: \${{ github.sha }}
         run: |
           set -Eeuo pipefail
           STAGE="$GITHUB_WORKSPACE/release-stage"
@@ -128,14 +160,16 @@ jobs:
           sha256sum "samp-ai-$RELEASE_VERSION.zip" "samp-ai-$RELEASE_VERSION.tar.gz" > "samp-ai-$RELEASE_VERSION.sha256"
 
       - name: Publish release and attach build artifacts
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
+          tag_name: \${{ steps.release.outputs.version }}
+          target_commitish: \${{ github.sha }}
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
-            samp-ai-${{ github.ref_name }}.zip
-            samp-ai-${{ github.ref_name }}.tar.gz
-            samp-ai-${{ github.ref_name }}.sha256
+            samp-ai-\${{ steps.release.outputs.version }}.zip
+            samp-ai-\${{ steps.release.outputs.version }}.tar.gz
+            samp-ai-\${{ steps.release.outputs.version }}.sha256
             release-stage/samp-ai/adapters/pawn/build/samp/samp_ai_adapter.amx
             release-stage/samp-ai/adapters/pawn/build/openmp/samp_ai_adapter.amx
             release-stage/samp-ai/adapters/pawn/build/build-info.txt
