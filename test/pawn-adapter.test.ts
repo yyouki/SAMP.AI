@@ -28,7 +28,12 @@ function createPawnActionHarness() {
         version: "0.1.0",
         runtime: "open.mp"
       },
-      capabilities: ["context.player_state", "mapping.create_object"],
+      capabilities: [
+        "context.player_state",
+        "mapping.create_object",
+        "mapping.preview_player_object",
+        "mapping.clear_player_preview"
+      ],
       limits: {
         max_operations_per_batch: 1,
         max_objects_per_project: 400
@@ -53,7 +58,7 @@ test("Pawn adapter registers only its implemented read and mapping actions", () 
 
   assert.deepEqual(
     actions.list().map((entry) => entry.id),
-    ["context.get_player_state", "mapping.create_object"]
+    ["context.get_player_state", "mapping.create_object", "mapping.preview_player_object", "mapping.clear_player_preview"]
   );
 
   assert.equal(actions.get("context.get_player_state").effect, "read");
@@ -124,6 +129,93 @@ test("Pawn mapping action schema accepts a supported global object task and resu
     { status: "succeeded", output: result }
   );
   assert.equal(completed.state, "succeeded");
+});
+
+test("Pawn player preview is session-bound and can be explicitly cleared", () => {
+  const { actions, schemas, queue } = createPawnActionHarness();
+  const preview = actions.get("mapping.preview_player_object");
+  const clear = actions.get("mapping.clear_player_preview");
+
+  assert.equal(preview.idempotent, false);
+  assert.equal(preview.compensation, "undo");
+  assert.equal(clear.idempotent, true);
+
+  const previewPayload = {
+    preview_id: "hospital-wall-preview-01",
+    project_id: "hospital",
+    player_id: 7,
+    player_session_id: "p7_1000_1",
+    model_id: 19377,
+    position: { x: 100, y: 200, z: 5 },
+    rotation: { x: 0, y: 0, z: 90 }
+  };
+  schemas.assert(preview.payloadSchema, previewPayload, "Pawn player preview payload");
+
+  const previewResult = {
+    ...previewPayload,
+    runtime_object_id: 21,
+    scope: "player"
+  };
+  schemas.assert(preview.resultSchema, previewResult, "Pawn player preview result");
+
+  const previewTask = queue.enqueue({
+    serverInstanceId: "pawn-server",
+    adapterId: "sampai-pawn",
+    actionId: preview.id,
+    idempotencyKey: "player-preview-0001",
+    payload: previewPayload
+  });
+  const previewLease = queue.claimNext("pawn-server", "sampai-pawn");
+  assert.ok(previewLease);
+  const completedPreview = queue.complete(
+    "pawn-server",
+    "sampai-pawn",
+    previewLease.taskId,
+    previewLease.leaseToken,
+    { status: "succeeded", output: previewResult }
+  );
+  assert.equal(completedPreview.taskId, previewTask.taskId);
+  assert.equal(completedPreview.state, "succeeded");
+
+  const clearPayload = {
+    preview_id: "hospital-wall-preview-01",
+    player_id: 7,
+    player_session_id: "p7_1000_1"
+  };
+  schemas.assert(clear.payloadSchema, clearPayload, "Pawn player preview clear payload");
+  const clearResult = {
+    ...clearPayload,
+    cleared: true,
+    scope: "player"
+  };
+  schemas.assert(clear.resultSchema, clearResult, "Pawn player preview clear result");
+
+  const clearTask = queue.enqueue({
+    serverInstanceId: "pawn-server",
+    adapterId: "sampai-pawn",
+    actionId: clear.id,
+    idempotencyKey: "player-preview-clear-0001",
+    payload: clearPayload
+  });
+  const clearLease = queue.claimNext("pawn-server", "sampai-pawn");
+  assert.ok(clearLease);
+  const completedClear = queue.complete(
+    "pawn-server",
+    "sampai-pawn",
+    clearLease.taskId,
+    clearLease.leaseToken,
+    { status: "succeeded", output: clearResult }
+  );
+  assert.equal(completedClear.taskId, clearTask.taskId);
+  assert.equal(completedClear.state, "succeeded");
+
+  assert.throws(
+    () => schemas.assert(preview.payloadSchema, {
+      ...previewPayload,
+      player_session_id: "session with spaces"
+    }, "invalid session"),
+    /Invalid invalid session/
+  );
 });
 
 test("Pawn context action and mapping tasks can be enqueued only for advertised capabilities", () => {
