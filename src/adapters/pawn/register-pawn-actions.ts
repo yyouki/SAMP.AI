@@ -45,7 +45,7 @@ const playerStateAction: AdapterActionDefinition = {
 
 const createObjectAction: AdapterActionDefinition = {
   id: "mapping.create_object",
-  description: "Create one global server object in world 0 and interior 0.",
+  description: "Create a server-wide global object; this native cannot scope it to one interior or virtual world.",
   requiredCapabilities: ["mapping.create_object"],
   effect: "mutate",
   risk: "medium",
@@ -86,8 +86,9 @@ const createObjectAction: AdapterActionDefinition = {
       runtime_object_id: { type: "integer", minimum: 0, maximum: 65535 },
       position: vectorSchema,
       rotation: vectorSchema,
-      interior_id: { type: "integer", minimum: 0, maximum: 255 },
-      virtual_world_id: { type: "integer", minimum: 0, maximum: 2147483647 }
+      scope: { const: "global" },
+      requested_interior_id: { type: "integer", minimum: 0, maximum: 255 },
+      requested_virtual_world_id: { type: "integer", minimum: 0, maximum: 2147483647 }
     },
     required: [
       "object_id",
@@ -95,8 +96,9 @@ const createObjectAction: AdapterActionDefinition = {
       "model_id",
       "position",
       "rotation",
-      "interior_id",
-      "virtual_world_id"
+      "scope",
+      "requested_interior_id",
+      "requested_virtual_world_id"
     ]
   }
 };
