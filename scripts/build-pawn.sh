@@ -124,6 +124,15 @@ compile_target() {
   printf '#define OPEN_MP_NO_WRAPPER_WARNING\n#define SAMP_AI_OPEN_MP\n' > "$generated_source"
   cat "$SOURCE" >> "$generated_source"
 
+  echo "Generated target preamble for $target:"
+  sed -n '1,4p' "$generated_source"
+  echo "Generated editor callback for $target:"
+  grep -n -A8 -B2 "OnPlayerEditObject" "$generated_source" | head -n 24 || true
+  echo "Included callback prototypes for $target:"
+  grep -R -n "forward OnPlayerEditObject" "$includes" "$INCLUDE_ROOT" 2>/dev/null | head -n 8 || true
+  echo "EDIT_RESPONSE macro definitions for $target:"
+  grep -R -n "#define EDIT_RESPONSE" "$includes" "$INCLUDE_ROOT" 2>/dev/null | head -n 8 || true
+
   echo "Compiling Pawn adapter for $target..."
   "$PAWNCC" \
     "-i$includes" \
