@@ -7,8 +7,7 @@ import {
   JsonSchemaValidator,
   ProtocolValidator,
   createDefaultSchemaValidator,
-  registerPawnAdapterActions,
-  type AdapterActionDefinition
+  registerPawnAdapterActions
 } from "../src/index.js";
 
 function createPawnActionHarness() {
