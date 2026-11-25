@@ -49,12 +49,13 @@ This roadmap prioritizes a safe, testable end-to-end path before adding more ada
 ## Phase 3 — First open.mp adapter (Pawn)
 - [x] Add authenticated HTTP task claim, lease renewal, and result submission routes.
 - [ ] Implement durable task storage and worker-side task deduplication.
-- [x] Add a Pawn reference filterscript for authenticated hello, task polling, heartbeat, result submission, player-state reads, global object creation, and session-bound per-player preview/cleanup (runtime compilation/live validation remains open).
+- [x] Add a Pawn reference filterscript for authenticated hello, task polling, heartbeat, result submission, player-state reads, global object creation, session-bound per-player previews, and interactive preview editing (runtime compilation/live validation remains open).
 - [ ] Compile and connect the Pawn reference adapter to a real SA-MP/open.mp server with the documented HTTPS/JSON dependencies.
-- [x] Report server/runtime metadata and the four implemented Pawn capabilities in the handshake.
+- [x] Report server/runtime metadata and the six implemented Pawn capabilities in the handshake.
 - [x] Capture online player position, facing direction, interior, virtual-world context, and connection-session ID in the Pawn reference adapter.
 - [x] Capture interior and virtual-world context where available.
 - [x] Create and clean up one private per-player preview object, guarded by player connection-session and preview IDs.
+- [x] Start the native player-object editor without blocking the task queue; capture completed/cancelled edit state and transforms through a separate read action.
 - [ ] Implement production-grade bounded object creation / deletion queues.
 - [x] Add a first bounded Pawn global-object create action for interior 0 / virtual world 0.
 - [ ] Implement per-player native-world removal directives with session deduplication.
@@ -68,6 +69,7 @@ This roadmap prioritizes a safe, testable end-to-end path before adding more ada
 - [ ] Support object groups and reusable templates.
 - [ ] Validate model IDs, coordinate ranges, transforms, operation counts, and duplicates.
 - [x] Add a first per-player preview/ghost-object path supported by the Pawn adapter.
+- [x] Let an authorized reviewer move/rotate a private preview using the native object editor; keep the edited transform as a draft until a separate approval step.
 - [ ] Add revisions, undo, and restore for server-created objects.
 - [ ] Add explicit native-world removal history and reconnect/proxy compensation workflows; never claim exact native restore without runtime support.
 

@@ -6,7 +6,9 @@ The Mock Game Adapter is a deterministic in-memory runtime for testing the adapt
 
 | Action | Behavior |
 |---|---|
-| `context.get_player_state` | Read a seeded player's position, facing, interior, and virtual world. |
+| `context.get_player_state` | Read a seeded player's position, facing, interior, virtual world, and connection session. |
+| `mapping.preview_player_object` / `mapping.clear_player_preview` | Create and clear one session-bound private preview per player. |
+| `mapping.begin_player_preview_edit` / `mapping.get_player_preview_edit_result` | Simulate the native preview editor lifecycle and retrieve its result without opening a GUI. |
 | `anchor.create` / `anchor.list` | Store and list project anchors. |
 | `marker.create` / `marker.remove` | Create and remove temporary review markers. |
 | `mapping.create_object`, `mapping.update_object`, `mapping.delete_object` | Manage server-created mapping objects in a project. |
@@ -51,6 +53,7 @@ const mock = new MockGameAdapter(queue, serverInstanceId, adapterId);
 // Seed the simulated player context used by context.get_player_state.
 mock.setPlayerState({
   player_id: 7,
+  session_id: "local-player-7-session-01",
   position: { x: 100, y: 200, z: 5 },
   facing: 180,
   interior_id: 0,
@@ -101,3 +104,10 @@ The next task with that action ID is completed with a failed task result and doe
 - The mock adapter does not connect to a running game server, call Pawn natives, or render markers in-game.
 - A simulated native-world removal directive is only recorded. Real removal remains a future adapter responsibility and must preserve player-session scope and documented undo limitations.
 - Production adapters must pass the same protocol, schema, capability, authorization, idempotency, and task-result requirements. The mock implementation is a test harness, not a production runtime.
+
+
+## Private preview editing
+
+The mock adapter exposes the same `mapping.begin_player_preview_edit` and `mapping.get_player_preview_edit_result` actions as the Pawn reference adapter. It models the `ready` → `editing` → `completed` / `cancelled` lifecycle without opening a real GUI.
+
+Tests can simulate the native edit callback through `finishPlayerPreviewEdit`. A completed edit updates only the player-scoped preview transform. A cancelled edit preserves the last accepted transform. Session replacement and disconnect discard both the preview and its transient editor state. None of these actions creates a server-wide object or approves a draft.

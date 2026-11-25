@@ -302,6 +302,111 @@ test("mock game adapter scopes previews to a player session and ignores stale cl
   assert.equal(adapter.getPlayerPreview(7), undefined);
 });
 
+
+test("mock game adapter models preview editing, final transforms, cancellation, and stale sessions", () => {
+  const { queue, adapter } = createMockHarness();
+  const sessionId = "mock-player-7-session-edit";
+  const previewId = "hospital-preview-edit-01";
+  adapter.setPlayerState({
+    player_id: 7,
+    session_id: sessionId,
+    position: { x: 100, y: 200, z: 5 },
+    facing: 180,
+    interior_id: 0,
+    virtual_world_id: 0
+  });
+
+  enqueue(queue, "mapping.preview_player_object", {
+    preview_id: previewId,
+    project_id: "hospital",
+    player_id: 7,
+    player_session_id: sessionId,
+    model_id: 19377,
+    position: { x: 110, y: 210, z: 5 },
+    rotation: { x: 0, y: 0, z: 90 }
+  }, "preview-edit-create-0001");
+  assert.equal(processOne(adapter).state, "succeeded");
+
+  const beginPayload = {
+    preview_id: previewId,
+    player_id: 7,
+    player_session_id: sessionId
+  };
+  enqueue(queue, "mapping.begin_player_preview_edit", beginPayload, "preview-edit-begin-0001");
+  const begin = processOne(adapter);
+  assert.equal(begin.state, "succeeded");
+  assert.equal((begin.result?.output as { started: boolean }).started, true);
+
+  enqueue(queue, "mapping.begin_player_preview_edit", beginPayload, "preview-edit-begin-0002");
+  const duplicateBegin = processOne(adapter);
+  assert.equal(duplicateBegin.state, "succeeded");
+  assert.equal((duplicateBegin.result?.output as { started: boolean }).started, false);
+
+  enqueue(queue, "mapping.get_player_preview_edit_result", beginPayload, "preview-edit-read-0001");
+  const editing = processOne(adapter);
+  assert.equal(editing.state, "succeeded");
+  assert.equal((editing.result?.output as { status: string }).status, "editing");
+
+  assert.equal(adapter.finishPlayerPreviewEdit(
+    7,
+    previewId,
+    sessionId,
+    {
+      position: { x: 115, y: 211, z: 6 },
+      rotation: { x: 0, y: 0, z: 95 }
+    }
+  ), true);
+
+  enqueue(queue, "mapping.get_player_preview_edit_result", beginPayload, "preview-edit-read-0002");
+  const completed = processOne(adapter);
+  assert.equal(completed.state, "succeeded");
+  assert.equal((completed.result?.output as { status: string }).status, "completed");
+  assert.deepEqual(
+    (completed.result?.output as { position: unknown }).position,
+    { x: 115, y: 211, z: 6 }
+  );
+  assert.deepEqual(
+    (completed.result?.output as { rotation: unknown }).rotation,
+    { x: 0, y: 0, z: 95 }
+  );
+
+  enqueue(queue, "mapping.begin_player_preview_edit", beginPayload, "preview-edit-begin-0003");
+  assert.equal(processOne(adapter).state, "succeeded");
+  assert.equal(adapter.finishPlayerPreviewEdit(
+    7,
+    previewId,
+    sessionId,
+    {
+      position: { x: 999, y: 999, z: 999 },
+      rotation: { x: 1, y: 1, z: 1 }
+    },
+    true
+  ), true);
+
+  enqueue(queue, "mapping.get_player_preview_edit_result", beginPayload, "preview-edit-read-0003");
+  const cancelled = processOne(adapter);
+  assert.equal(cancelled.state, "succeeded");
+  assert.equal((cancelled.result?.output as { status: string }).status, "cancelled");
+  assert.deepEqual(
+    (cancelled.result?.output as { position: unknown }).position,
+    { x: 115, y: 211, z: 6 }
+  );
+
+  adapter.setPlayerState({
+    player_id: 7,
+    session_id: "mock-player-7-session-reused",
+    position: { x: 10, y: 20, z: 3 },
+    facing: 0,
+    interior_id: 0,
+    virtual_world_id: 0
+  });
+  enqueue(queue, "mapping.get_player_preview_edit_result", beginPayload, "preview-edit-read-stale-0001");
+  const stale = processOne(adapter);
+  assert.equal(stale.state, "succeeded");
+  assert.equal((stale.result?.output as { found: boolean }).found, false);
+  assert.equal((stale.result?.output as { status: string }).status, "not_found");
+});
+
 test("mock game adapter returns deterministic injected failures as task results", () => {
   const { queue, adapter } = createMockHarness();
   adapter.failNext("mapping.create_object", {

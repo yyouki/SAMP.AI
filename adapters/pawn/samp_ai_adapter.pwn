@@ -47,6 +47,9 @@ new g_SampAiLeaseToken[128];
 new g_SampAiCreatedObjectCount;
 new g_SampAiPreviewObject[MAX_PLAYERS];
 new g_SampAiPreviewId[MAX_PLAYERS][101];
+new g_SampAiPreviewEditState[MAX_PLAYERS]; // 0=ready, 1=editing, 2=completed, 3=cancelled
+new Float:g_SampAiPreviewPosition[MAX_PLAYERS][3];
+new Float:g_SampAiPreviewRotation[MAX_PLAYERS][3];
 new g_SampAiPlayerSessionId[MAX_PLAYERS][101];
 new g_SampAiSessionSequence;
 
@@ -67,11 +70,24 @@ stock SampAI_StartPlayerSession(playerid)
     );
     g_SampAiPreviewObject[playerid] = INVALID_OBJECT_ID;
     g_SampAiPreviewId[playerid][0] = EOS;
+    g_SampAiPreviewEditState[playerid] = 0;
+    g_SampAiPreviewPosition[playerid][0] = 0.0;
+    g_SampAiPreviewPosition[playerid][1] = 0.0;
+    g_SampAiPreviewPosition[playerid][2] = 0.0;
+    g_SampAiPreviewRotation[playerid][0] = 0.0;
+    g_SampAiPreviewRotation[playerid][1] = 0.0;
+    g_SampAiPreviewRotation[playerid][2] = 0.0;
     return 1;
 }
 
 stock SampAI_ClearPreviewForPlayer(playerid)
 {
+    if (g_SampAiPreviewEditState[playerid] == 1 && IsPlayerConnected(playerid))
+    {
+        // Exit the native editor before destroying the object it is operating on.
+        CancelEdit(playerid);
+    }
+
     new objectId = g_SampAiPreviewObject[playerid];
     if (objectId != INVALID_OBJECT_ID && IsValidPlayerObject(playerid, objectId))
     {
@@ -80,6 +96,13 @@ stock SampAI_ClearPreviewForPlayer(playerid)
 
     g_SampAiPreviewObject[playerid] = INVALID_OBJECT_ID;
     g_SampAiPreviewId[playerid][0] = EOS;
+    g_SampAiPreviewEditState[playerid] = 0;
+    g_SampAiPreviewPosition[playerid][0] = 0.0;
+    g_SampAiPreviewPosition[playerid][1] = 0.0;
+    g_SampAiPreviewPosition[playerid][2] = 0.0;
+    g_SampAiPreviewRotation[playerid][0] = 0.0;
+    g_SampAiPreviewRotation[playerid][1] = 0.0;
+    g_SampAiPreviewRotation[playerid][2] = 0.0;
     return 1;
 }
 
@@ -137,6 +160,60 @@ public OnPlayerDisconnect(playerid, reason)
     SampAI_ClearPreviewForPlayer(playerid);
     g_SampAiPlayerSessionId[playerid][0] = EOS;
     return 1;
+}
+
+stock SampAI_StorePreviewTransform(playerid, Float:x, Float:y, Float:z, Float:rx, Float:ry, Float:rz)
+{
+    g_SampAiPreviewPosition[playerid][0] = x;
+    g_SampAiPreviewPosition[playerid][1] = y;
+    g_SampAiPreviewPosition[playerid][2] = z;
+    g_SampAiPreviewRotation[playerid][0] = rx;
+    g_SampAiPreviewRotation[playerid][1] = ry;
+    g_SampAiPreviewRotation[playerid][2] = rz;
+    return 1;
+}
+
+public OnPlayerEditObject(playerid, playerobject, objectid, EDIT_RESPONSE:response,
+    Float:x, Float:y, Float:z, Float:rx, Float:ry, Float:rz)
+{
+    // Only consume callbacks for this filterscript's active player-object preview.
+    if (playerid < 0 || playerid >= MAX_PLAYERS || !playerobject ||
+        !IsPlayerConnected(playerid) ||
+        objectid != g_SampAiPreviewObject[playerid] ||
+        g_SampAiPreviewEditState[playerid] != 1)
+    {
+        return 0;
+    }
+
+    if (response == EDIT_RESPONSE_FINAL)
+    {
+        SetPlayerObjectPos(playerid, objectid, x, y, z);
+        SetPlayerObjectRot(playerid, objectid, rx, ry, rz);
+        SampAI_StorePreviewTransform(playerid, x, y, z, rx, ry, rz);
+        g_SampAiPreviewEditState[playerid] = 2;
+    }
+    else if (response == EDIT_RESPONSE_CANCEL)
+    {
+        // The GUI may have moved the object before cancel; restore the last accepted transform.
+        SetPlayerObjectPos(
+            playerid,
+            objectid,
+            g_SampAiPreviewPosition[playerid][0],
+            g_SampAiPreviewPosition[playerid][1],
+            g_SampAiPreviewPosition[playerid][2]
+        );
+        SetPlayerObjectRot(
+            playerid,
+            objectid,
+            g_SampAiPreviewRotation[playerid][0],
+            g_SampAiPreviewRotation[playerid][1],
+            g_SampAiPreviewRotation[playerid][2]
+        );
+        g_SampAiPreviewEditState[playerid] = 3;
+    }
+
+    // Do not block other filterscripts from receiving this callback.
+    return 0;
 }
 
 stock bool:SampAI_LoadConfig()
@@ -219,6 +296,8 @@ stock SampAI_BuildHello(body[], maxlen)
     JSON_ArrayAppendString(capabilities, "mapping.create_object");
     JSON_ArrayAppendString(capabilities, "mapping.preview_player_object");
     JSON_ArrayAppendString(capabilities, "mapping.clear_player_preview");
+    JSON_ArrayAppendString(capabilities, "mapping.begin_player_preview_edit");
+    JSON_ArrayAppendString(capabilities, "mapping.get_player_preview_edit_result");
 
     JSON_ObjectSetInt(limits, "max_operations_per_batch", 1);
     JSON_ObjectSetInt(limits, "max_objects_per_project", SAMP_AI_MAX_CREATED_OBJECTS);
@@ -654,6 +733,8 @@ stock bool:SampAI_ExecuteTask(
         SampAI_ClearPreviewForPlayer(playerId);
         g_SampAiPreviewObject[playerId] = nativeObjectId;
         format(g_SampAiPreviewId[playerId], sizeof(g_SampAiPreviewId[]), "%s", previewId);
+        g_SampAiPreviewEditState[playerId] = 0;
+        SampAI_StorePreviewTransform(playerId, x, y, z, rx, ry, rz);
 
         JSON_ObjectSetString(outputNode, "preview_id", previewId);
         JSON_ObjectSetString(outputNode, "project_id", projectId);
@@ -661,6 +742,115 @@ stock bool:SampAI_ExecuteTask(
         JSON_ObjectSetString(outputNode, "player_session_id", playerSessionId);
         JSON_ObjectSetInt(outputNode, "runtime_object_id", nativeObjectId);
         JSON_ObjectSetInt(outputNode, "model_id", modelId);
+        SampAI_AddVector(documentId, outputNode, "position", x, y, z);
+        SampAI_AddVector(documentId, outputNode, "rotation", rx, ry, rz);
+        JSON_ObjectSetString(outputNode, "scope", "player");
+        return true;
+    }
+
+    if (!strcmp(actionId, "mapping.begin_player_preview_edit", true))
+    {
+        new previewId[101], playerSessionId[101];
+        new playerId;
+
+        if (!JSON_GetStringByPath(payloadNode, "preview_id", previewId, sizeof(previewId)) ||
+            !JSON_GetStringByPath(payloadNode, "player_session_id", playerSessionId, sizeof(playerSessionId)) ||
+            !JSON_GetIntByPath(payloadNode, "player_id", playerId) ||
+            playerId < 0 || playerId >= MAX_PLAYERS)
+        {
+            format(errorCode, errorCodeSize, "PREVIEW_EDIT_PAYLOAD_INVALID");
+            format(errorMessage, errorMessageSize, "The preview edit payload is incomplete or player_id is invalid.");
+            return false;
+        }
+
+        if (!IsPlayerConnected(playerId) ||
+            strcmp(playerSessionId, g_SampAiPlayerSessionId[playerId], false) != 0)
+        {
+            format(errorCode, errorCodeSize, "PLAYER_SESSION_MISMATCH");
+            format(errorMessage, errorMessageSize, "The target player is offline or the connection session has changed.");
+            return false;
+        }
+
+        if (strcmp(previewId, g_SampAiPreviewId[playerId], false) != 0 ||
+            g_SampAiPreviewObject[playerId] == INVALID_OBJECT_ID ||
+            !IsValidPlayerObject(playerId, g_SampAiPreviewObject[playerId]))
+        {
+            format(errorCode, errorCodeSize, "PLAYER_PREVIEW_NOT_FOUND");
+            format(errorMessage, errorMessageSize, "The requested private preview is no longer active.");
+            return false;
+        }
+
+        new bool:started = false;
+        if (g_SampAiPreviewEditState[playerId] != 1)
+        {
+            g_SampAiPreviewEditState[playerId] = 1;
+            if (!EditPlayerObject(playerId, g_SampAiPreviewObject[playerId]))
+            {
+                g_SampAiPreviewEditState[playerId] = 0;
+                format(errorCode, errorCodeSize, "PLAYER_PREVIEW_EDIT_START_FAILED");
+                format(errorMessage, errorMessageSize, "The native player-object editor could not be started.");
+                return false;
+            }
+            started = true;
+        }
+
+        JSON_ObjectSetString(outputNode, "preview_id", previewId);
+        JSON_ObjectSetInt(outputNode, "player_id", playerId);
+        JSON_ObjectSetString(outputNode, "player_session_id", playerSessionId);
+        JSON_ObjectSetBool(outputNode, "started", started);
+        JSON_ObjectSetString(outputNode, "scope", "player");
+        return true;
+    }
+
+    if (!strcmp(actionId, "mapping.get_player_preview_edit_result", true))
+    {
+        new previewId[101], playerSessionId[101], state[24];
+        new playerId;
+        new bool:found = false;
+        new Float:x, Float:y, Float:z, Float:rx, Float:ry, Float:rz;
+
+        if (!JSON_GetStringByPath(payloadNode, "preview_id", previewId, sizeof(previewId)) ||
+            !JSON_GetStringByPath(payloadNode, "player_session_id", playerSessionId, sizeof(playerSessionId)) ||
+            !JSON_GetIntByPath(payloadNode, "player_id", playerId) ||
+            playerId < 0 || playerId >= MAX_PLAYERS)
+        {
+            format(errorCode, errorCodeSize, "PREVIEW_EDIT_RESULT_PAYLOAD_INVALID");
+            format(errorMessage, errorMessageSize, "The preview edit result payload is incomplete or player_id is invalid.");
+            return false;
+        }
+
+        if (IsPlayerConnected(playerId) &&
+            strcmp(playerSessionId, g_SampAiPlayerSessionId[playerId], false) == 0 &&
+            strcmp(previewId, g_SampAiPreviewId[playerId], false) == 0 &&
+            g_SampAiPreviewObject[playerId] != INVALID_OBJECT_ID &&
+            IsValidPlayerObject(playerId, g_SampAiPreviewObject[playerId]))
+        {
+            found = true;
+            x = g_SampAiPreviewPosition[playerId][0];
+            y = g_SampAiPreviewPosition[playerId][1];
+            z = g_SampAiPreviewPosition[playerId][2];
+            rx = g_SampAiPreviewRotation[playerId][0];
+            ry = g_SampAiPreviewRotation[playerId][1];
+            rz = g_SampAiPreviewRotation[playerId][2];
+
+            switch (g_SampAiPreviewEditState[playerId])
+            {
+                case 1: format(state, sizeof(state), "editing");
+                case 2: format(state, sizeof(state), "completed");
+                case 3: format(state, sizeof(state), "cancelled");
+                default: format(state, sizeof(state), "ready");
+            }
+        }
+        else
+        {
+            format(state, sizeof(state), "not_found");
+        }
+
+        JSON_ObjectSetString(outputNode, "preview_id", previewId);
+        JSON_ObjectSetInt(outputNode, "player_id", playerId);
+        JSON_ObjectSetString(outputNode, "player_session_id", playerSessionId);
+        JSON_ObjectSetBool(outputNode, "found", found);
+        JSON_ObjectSetString(outputNode, "status", state);
         SampAI_AddVector(documentId, outputNode, "position", x, y, z);
         SampAI_AddVector(documentId, outputNode, "rotation", rx, ry, rz);
         JSON_ObjectSetString(outputNode, "scope", "player");

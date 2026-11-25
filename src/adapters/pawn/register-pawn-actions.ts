@@ -202,6 +202,84 @@ const clearPlayerPreviewAction: AdapterActionDefinition = {
   }
 };
 
+
+const beginPlayerPreviewEditAction: AdapterActionDefinition = {
+  id: "mapping.begin_player_preview_edit",
+  description: "Open the native object editor for the matching private preview without waiting for the user's GUI interaction.",
+  requiredCapabilities: ["mapping.begin_player_preview_edit"],
+  effect: "mutate",
+  risk: "low",
+  // Starting an already-active edit is treated as a no-op, making the action safe to replay.
+  idempotent: true,
+  compensation: "none",
+  payloadSchema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      preview_id: portableId(1, 100),
+      player_id: { type: "integer", minimum: 0, maximum: 1004 },
+      player_session_id: portableId(1, 100)
+    },
+    required: ["preview_id", "player_id", "player_session_id"]
+  },
+  resultSchema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      preview_id: portableId(1, 100),
+      player_id: { type: "integer", minimum: 0, maximum: 1004 },
+      player_session_id: portableId(1, 100),
+      started: { type: "boolean" },
+      scope: { const: "player" }
+    },
+    required: ["preview_id", "player_id", "player_session_id", "started", "scope"]
+  }
+};
+
+const getPlayerPreviewEditResultAction: AdapterActionDefinition = {
+  id: "mapping.get_player_preview_edit_result",
+  description: "Read the current native editor state and final transform for a matching private preview.",
+  requiredCapabilities: ["mapping.get_player_preview_edit_result"],
+  effect: "read",
+  risk: "low",
+  idempotent: true,
+  compensation: "none",
+  payloadSchema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      preview_id: portableId(1, 100),
+      player_id: { type: "integer", minimum: 0, maximum: 1004 },
+      player_session_id: portableId(1, 100)
+    },
+    required: ["preview_id", "player_id", "player_session_id"]
+  },
+  resultSchema: {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      preview_id: portableId(1, 100),
+      player_id: { type: "integer", minimum: 0, maximum: 1004 },
+      player_session_id: portableId(1, 100),
+      found: { type: "boolean" },
+      status: { enum: ["ready", "editing", "completed", "cancelled", "not_found"] },
+      position: vectorSchema,
+      rotation: vectorSchema,
+      scope: { const: "player" }
+    },
+    required: [
+      "preview_id",
+      "player_id",
+      "player_session_id",
+      "found",
+      "status",
+      "position",
+      "rotation",
+      "scope"
+    ]
+  }
+};
+
 /** Register only operations implemented by the Pawn reference filterscript. */
 export function registerPawnAdapterActions(
   registry: AdapterActionRegistry
@@ -210,6 +288,8 @@ export function registerPawnAdapterActions(
   registry.register(createObjectAction);
   registry.register(previewPlayerObjectAction);
   registry.register(clearPlayerPreviewAction);
+  registry.register(beginPlayerPreviewEditAction);
+  registry.register(getPlayerPreviewEditResultAction);
 }
 
 /** Expose immutable action definitions for documentation and conformance tests. */
@@ -218,6 +298,8 @@ export function listPawnAdapterActions(): readonly AdapterActionDefinition[] {
     playerStateAction,
     createObjectAction,
     previewPlayerObjectAction,
-    clearPlayerPreviewAction
+    clearPlayerPreviewAction,
+    beginPlayerPreviewEditAction,
+    getPlayerPreviewEditResultAction
   ]);
 }

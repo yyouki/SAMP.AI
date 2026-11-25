@@ -4,7 +4,7 @@
 
 SAMP.AI is intended to help server owners and developers design, inspect, preview, and manage in-game content such as map objects and TextDraw interfaces. It is designed as a collaborative assistant: it can propose ideas proactively, but it must discuss uncertain requirements and obtain the required approval before applying changes.
 
-**Project status: Early core scaffold.** The repository contains TypeScript core primitives, protocol/extension schemas, adapter and skill registries, a declarative extension loader, a bounded provider-neutral agent loop, and an optional OpenAI Responses API provider. An in-memory typed adapter task queue and deterministic Mock Game Adapter are included for end-to-end local simulation. An initial Pawn reference filterscript for authenticated task polling, player-state reads, global object creation, and session-bound per-player preview/cleanup is included, but it has not been compiled or live-tested against a server. A production-validated open.mp adapter, durable queue/persistent storage, production authentication/approval services, and runtime installer are not implemented yet.
+**Project status: Early core scaffold.** The repository contains TypeScript core primitives, protocol/extension schemas, adapter and skill registries, a declarative extension loader, a bounded provider-neutral agent loop, and an optional OpenAI Responses API provider. An in-memory typed adapter task queue and deterministic Mock Game Adapter are included for end-to-end local simulation. An initial Pawn reference filterscript for authenticated task polling, player-state reads, global object creation, session-bound per-player previews, and interactive preview editing is included, but it has not been compiled or live-tested against a server. A production-validated open.mp adapter, durable queue/persistent storage, production authentication/approval services, and runtime installer are not implemented yet.
 
 ## Project goals
 
@@ -73,7 +73,7 @@ The AI core must not depend on Pawn. Adapters expose capabilities and translate 
 
 ## Local adapter simulation
 
-The Mock Game Adapter processes the same typed task queue used by real adapters. It simulates player state, session-bound per-player preview objects, anchors, review markers, server-created mapping objects, and per-player native-world removal directives. It is intended for deterministic tests and local development only; it does not connect to a running SA-MP/open.mp server. Native-world removal is recorded as a simulated directive and is never represented as a real removal.
+The Mock Game Adapter processes the same typed task queue used by real adapters. It simulates player state, session-bound per-player preview objects and their edit lifecycle, anchors, review markers, server-created mapping objects, and per-player native-world removal directives. It is intended for deterministic tests and local development only; it does not connect to a running SA-MP/open.mp server. Native-world removal is recorded as a simulated directive and is never represented as a real removal.
 
 See [Mock Game Adapter](docs/MOCK_GAME_ADAPTER.md).
 
@@ -108,6 +108,7 @@ The AI may discuss, inspect, plan, and prepare drafts according to the user's pe
 - [Core implementation](docs/CORE_IMPLEMENTATION.md)
 - [HTTP adapter gateway](docs/ADAPTER_GATEWAY.md)
 - [Pawn adapter reference](docs/PAWN_ADAPTER.md)
+- [Project context and durable handoff](docs/PROJECT_CONTEXT.md)
 - [AI behavior and permissions](docs/AI_BEHAVIOR.md)
 - [Coordinate and marker workflow](docs/COORDINATES_AND_MARKERS.md)
 - [Native GTA world objects and undo/redo](docs/NATIVE_WORLD_OBJECTS.md)

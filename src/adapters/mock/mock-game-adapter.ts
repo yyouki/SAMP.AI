@@ -46,6 +46,12 @@ export interface MockMarker {
   readonly color: string;
 }
 
+export interface MockPlayerPreviewEditSession {
+  readonly preview_id: string;
+  readonly player_session_id: string;
+  readonly status: "ready" | "editing" | "completed" | "cancelled";
+}
+
 export interface MockPlayerPreview {
   readonly preview_id: string;
   readonly project_id: string;
@@ -181,6 +187,25 @@ const playerPreviewResultSchema = objectSchema({
   scope: { const: "player" }
 });
 
+const beginPlayerPreviewEditResultSchema = objectSchema({
+  preview_id: entityIdSchema,
+  player_id: { type: "integer", minimum: 0, maximum: 1004 },
+  player_session_id: entityIdSchema,
+  started: { type: "boolean" },
+  scope: { const: "player" }
+});
+
+const getPlayerPreviewEditResultSchema = objectSchema({
+  preview_id: entityIdSchema,
+  player_id: { type: "integer", minimum: 0, maximum: 1004 },
+  player_session_id: entityIdSchema,
+  found: { type: "boolean" },
+  status: { enum: ["ready", "editing", "completed", "cancelled", "not_found"] },
+  position: vectorSchema,
+  rotation: vectorSchema,
+  scope: { const: "player" }
+});
+
 const clearPlayerPreviewResultSchema = objectSchema({
   preview_id: entityIdSchema,
   player_id: { type: "integer", minimum: 0, maximum: 1004 },
@@ -200,6 +225,8 @@ const resultSchemas: Record<string, JsonSchema> = {
     virtual_world_id: integerIdSchema
   }, ["player_id", "found", "session_id"]),
   "mapping.preview_player_object": playerPreviewResultSchema,
+  "mapping.begin_player_preview_edit": beginPlayerPreviewEditResultSchema,
+  "mapping.get_player_preview_edit_result": getPlayerPreviewEditResultSchema,
   "mapping.clear_player_preview": clearPlayerPreviewResultSchema,
   "anchor.create": anchorResultSchema,
   "anchor.list": objectSchema({
@@ -252,6 +279,36 @@ const previewPlayerObjectAction: AdapterActionDefinition = {
   resultSchema: playerPreviewResultSchema
 };
 
+const beginPlayerPreviewEditAction = action(
+  "mapping.begin_player_preview_edit",
+  "Begin editing only the matching private player preview.",
+  "mapping.begin_player_preview_edit",
+  "mutate",
+  "low",
+  "none",
+  objectSchema({
+    preview_id: entityIdSchema,
+    player_id: { type: "integer", minimum: 0, maximum: 1004 },
+    player_session_id: entityIdSchema
+  }),
+  beginPlayerPreviewEditResultSchema
+);
+
+const getPlayerPreviewEditResultAction = action(
+  "mapping.get_player_preview_edit_result",
+  "Read edit status and current transform for the matching private player preview.",
+  "mapping.get_player_preview_edit_result",
+  "read",
+  "low",
+  "none",
+  objectSchema({
+    preview_id: entityIdSchema,
+    player_id: { type: "integer", minimum: 0, maximum: 1004 },
+    player_session_id: entityIdSchema
+  }),
+  getPlayerPreviewEditResultSchema
+);
+
 const definitions: AdapterActionDefinition[] = [
   action(
     "context.get_player_state",
@@ -264,6 +321,8 @@ const definitions: AdapterActionDefinition[] = [
     resultSchemas["context.get_player_state"]!
   ),
   previewPlayerObjectAction,
+  beginPlayerPreviewEditAction,
+  getPlayerPreviewEditResultAction,
   action(
     "mapping.clear_player_preview",
     "Clear only the matching preview for the same player session.",
@@ -415,6 +474,8 @@ const definitions: AdapterActionDefinition[] = [
 export const MOCK_GAME_ADAPTER_CAPABILITIES = Object.freeze([
   "context.player_state",
   "mapping.preview_player_object",
+  "mapping.begin_player_preview_edit",
+  "mapping.get_player_preview_edit_result",
   "mapping.clear_player_preview",
   "anchor.create",
   "anchor.list",
@@ -494,6 +555,7 @@ function asVector(value: unknown): MockVector3 {
 export class MockGameAdapter {
   private readonly players = new Map<number, MockPlayerState>();
   private readonly playerPreviews = new Map<number, MockPlayerPreview>();
+  private readonly playerPreviewEditSessions = new Map<number, MockPlayerPreviewEditSession>();
   private nextPreviewRuntimeId = 1;
   private readonly objects = new Map<string, MockGameObject>();
   private readonly anchors = new Map<string, MockAnchor>();
@@ -519,6 +581,7 @@ export class MockGameAdapter {
       if (activePreview?.player_session_id === prior.session_id) {
         this.playerPreviews.delete(state.player_id);
       }
+      this.playerPreviewEditSessions.delete(state.player_id);
     }
     this.players.set(state.player_id, Object.freeze(structuredClone(state)));
   }
@@ -531,12 +594,64 @@ export class MockGameAdapter {
     if (activePreview?.player_session_id === prior.session_id) {
       this.playerPreviews.delete(playerId);
     }
+    this.playerPreviewEditSessions.delete(playerId);
     this.players.delete(playerId);
   }
 
   getPlayerPreview(playerId: number): MockPlayerPreview | undefined {
     const preview = this.playerPreviews.get(playerId);
     return preview ? structuredClone(preview) : undefined;
+  }
+
+  /**
+   * Simulate the native OnPlayerEditObject callback. A cancelled edit preserves
+   * the prior transform; a final edit replaces it in the private preview only.
+   */
+  finishPlayerPreviewEdit(
+    playerId: number,
+    previewId: string,
+    playerSessionId: string,
+    transform: { readonly position: MockVector3; readonly rotation: MockVector3 },
+    cancelled = false
+  ): boolean {
+    const player = this.players.get(playerId);
+    const preview = this.playerPreviews.get(playerId);
+    const edit = this.playerPreviewEditSessions.get(playerId);
+    if (
+      !player ||
+      player.session_id !== playerSessionId ||
+      !preview ||
+      preview.preview_id !== previewId ||
+      preview.player_session_id !== playerSessionId ||
+      !edit ||
+      edit.preview_id !== previewId ||
+      edit.player_session_id !== playerSessionId ||
+      edit.status !== "editing"
+    ) {
+      return false;
+    }
+
+    if (cancelled) {
+      this.playerPreviewEditSessions.set(playerId, Object.freeze({
+        preview_id: previewId,
+        player_session_id: playerSessionId,
+        status: "cancelled"
+      }));
+      return true;
+    }
+
+    const updated = Object.freeze({
+      ...preview,
+      position: asVector(transform.position),
+      rotation: asVector(transform.rotation)
+    });
+    this.playerPreviews.set(playerId, updated);
+    this.playerPreviewEditSessions.set(playerId, Object.freeze({
+      preview_id: previewId,
+      player_session_id: playerSessionId,
+      status: "completed"
+    }));
+    return true;
   }
 
   /** Inject one deterministic failure for the next task with this action ID. */
@@ -654,7 +769,86 @@ export class MockGameAdapter {
         scope: "player"
       });
       this.playerPreviews.set(playerId, preview);
+      this.playerPreviewEditSessions.set(playerId, Object.freeze({
+        preview_id: preview.preview_id,
+        player_session_id: playerSessionId,
+        status: "ready"
+      }));
       return structuredClone(preview);
+    }
+
+    if (actionId === "mapping.begin_player_preview_edit") {
+      const playerId = payload.player_id as number;
+      const previewId = payload.preview_id as string;
+      const playerSessionId = payload.player_session_id as string;
+      const player = this.players.get(playerId);
+      const preview = this.playerPreviews.get(playerId);
+      if (!player || player.session_id !== playerSessionId) {
+        throw new SampAiError(
+          "Target player is offline or the connection session changed.",
+          "MOCK_PLAYER_SESSION_MISMATCH"
+        );
+      }
+      if (
+        !preview ||
+        preview.preview_id !== previewId ||
+        preview.player_session_id !== playerSessionId
+      ) {
+        throw new SampAiError(
+          "The requested private preview is no longer active.",
+          "MOCK_PREVIEW_NOT_FOUND"
+        );
+      }
+
+      const priorEdit = this.playerPreviewEditSessions.get(playerId);
+      const started = priorEdit?.preview_id === previewId &&
+        priorEdit.player_session_id === playerSessionId &&
+        priorEdit.status === "editing"
+        ? false
+        : true;
+      if (started) {
+        this.playerPreviewEditSessions.set(playerId, Object.freeze({
+          preview_id: previewId,
+          player_session_id: playerSessionId,
+          status: "editing"
+        }));
+      }
+      return {
+        preview_id: previewId,
+        player_id: playerId,
+        player_session_id: playerSessionId,
+        started,
+        scope: "player"
+      };
+    }
+
+    if (actionId === "mapping.get_player_preview_edit_result") {
+      const playerId = payload.player_id as number;
+      const previewId = payload.preview_id as string;
+      const playerSessionId = payload.player_session_id as string;
+      const player = this.players.get(playerId);
+      const preview = this.playerPreviews.get(playerId);
+      const edit = this.playerPreviewEditSessions.get(playerId);
+      const found = Boolean(
+        player &&
+        player.session_id === playerSessionId &&
+        preview &&
+        preview.preview_id === previewId &&
+        preview.player_session_id === playerSessionId
+      );
+      return {
+        preview_id: previewId,
+        player_id: playerId,
+        player_session_id: playerSessionId,
+        found,
+        status: found && edit?.preview_id === previewId &&
+          edit.player_session_id === playerSessionId
+          ? edit.status
+          : found ? "ready" : "not_found",
+        position: found ? structuredClone(preview!.position) : { x: 0, y: 0, z: 0 },
+        rotation: found ? structuredClone(preview!.rotation) : { x: 0, y: 0, z: 0 },
+        scope: "player"
+      };
     }
 
     if (actionId === "mapping.clear_player_preview") {
@@ -675,6 +869,7 @@ export class MockGameAdapter {
         active.player_session_id === playerSessionId
       ) {
         this.playerPreviews.delete(playerId);
+        this.playerPreviewEditSessions.delete(playerId);
         cleared = true;
       }
 

@@ -74,6 +74,8 @@ const gateway = new HttpAdapterGateway(
 
 The application should enqueue a task only after its own actor permission, project scope, draft hash, and approval policy checks have succeeded. Adapter authentication is machine identity; it is not a substitute for an admin's approval.
 
+The snippets below show the individual task shapes, not a batch to enqueue all at once. Wait for and validate each task result before scheduling the next step. In particular, do not clear the preview or queue `mapping.create_object` until the edit result has been read, the draft has been revised and validated, and the authorized reviewer has explicitly approved the final draft.
+
 Example trusted orchestration calls:
 
 ```ts

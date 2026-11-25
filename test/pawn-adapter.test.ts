@@ -32,7 +32,9 @@ function createPawnActionHarness() {
         "context.player_state",
         "mapping.create_object",
         "mapping.preview_player_object",
-        "mapping.clear_player_preview"
+        "mapping.clear_player_preview",
+        "mapping.begin_player_preview_edit",
+        "mapping.get_player_preview_edit_result"
       ],
       limits: {
         max_operations_per_batch: 1,
@@ -58,7 +60,7 @@ test("Pawn adapter registers only its implemented read and mapping actions", () 
 
   assert.deepEqual(
     actions.list().map((entry) => entry.id),
-    ["context.get_player_state", "mapping.create_object", "mapping.preview_player_object", "mapping.clear_player_preview"]
+    ["context.get_player_state", "mapping.create_object", "mapping.preview_player_object", "mapping.clear_player_preview", "mapping.begin_player_preview_edit", "mapping.get_player_preview_edit_result"]
   );
 
   assert.equal(actions.get("context.get_player_state").effect, "read");
@@ -215,6 +217,63 @@ test("Pawn player preview is session-bound and can be explicitly cleared", () =>
       player_session_id: "session with spaces"
     }, "invalid session"),
     /Invalid invalid session/
+  );
+});
+
+
+test("Pawn preview editor starts asynchronously and exposes final or cancelled transforms", () => {
+  const { actions, schemas, queue } = createPawnActionHarness();
+  const begin = actions.get("mapping.begin_player_preview_edit");
+  const read = actions.get("mapping.get_player_preview_edit_result");
+  assert.equal(begin.effect, "mutate");
+  assert.equal(begin.idempotent, true);
+  assert.equal(read.effect, "read");
+  assert.equal(read.idempotent, true);
+
+  const payload = {
+    preview_id: "hospital-preview-edit-01",
+    player_id: 7,
+    player_session_id: "p7_2000_1"
+  };
+  schemas.assert(begin.payloadSchema, payload, "Pawn preview edit start payload");
+  schemas.assert(read.payloadSchema, payload, "Pawn preview edit state payload");
+
+  const beginResult = { ...payload, started: true, scope: "player" };
+  schemas.assert(begin.resultSchema, beginResult, "Pawn preview edit start result");
+  const beginTask = queue.enqueue({
+    serverInstanceId: "pawn-server",
+    adapterId: "sampai-pawn",
+    actionId: begin.id,
+    idempotencyKey: "preview-edit-start-0001",
+    payload
+  });
+  const beginLease = queue.claimNext("pawn-server", "sampai-pawn");
+  assert.ok(beginLease);
+  const beginCompleted = queue.complete(
+    "pawn-server",
+    "sampai-pawn",
+    beginLease.taskId,
+    beginLease.leaseToken,
+    { status: "succeeded", output: beginResult }
+  );
+  assert.equal(beginCompleted.taskId, beginTask.taskId);
+  assert.equal(beginCompleted.state, "succeeded");
+
+  const readResult = {
+    ...payload,
+    found: true,
+    status: "completed",
+    position: { x: 105, y: 202, z: 5 },
+    rotation: { x: 0, y: 0, z: 92 },
+    scope: "player"
+  };
+  schemas.assert(read.resultSchema, readResult, "Pawn preview edit result");
+  assert.throws(
+    () => schemas.assert(read.resultSchema, {
+      ...readResult,
+      status: "applied"
+    }, "invalid preview edit status"),
+    /Invalid invalid preview edit status/
   );
 });
 
