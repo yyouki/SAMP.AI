@@ -100,7 +100,7 @@ The in-memory bearer authenticator stores only SHA-256 digests of configured tok
 ## Current limitations
 
 This stage provides adapter registration/liveness plus an in-memory typed task queue. It does not yet provide:
-- a compiled and live-tested Pawn adapter; an initial reference filterscript exists, but it has not been validated against a real SA-MP/open.mp server and plugin combination;
+- a compiled and live-tested Pawn adapter; an initial reference filterscript exists for player-state reads, global object creation, and session-bound per-player previews, but it has not been validated against a real SA-MP/open.mp server and plugin combination;
 - a durable queue, database-backed leases, or durable idempotency ledger;
 - a player/admin authentication endpoint;
 - a public/admin endpoint for enqueueing tasks;
