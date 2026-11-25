@@ -525,8 +525,10 @@ stock bool:SampAI_ExecuteTask(
         JSON_ObjectSetInt(outputNode, "model_id", modelId);
         SampAI_AddVector(documentId, outputNode, "position", x, y, z);
         SampAI_AddVector(documentId, outputNode, "rotation", rx, ry, rz);
-        JSON_ObjectSetInt(outputNode, "interior_id", interiorId);
-        JSON_ObjectSetInt(outputNode, "virtual_world_id", virtualWorldId);
+        // CreateObject is global; do not claim the native scoped it.
+        JSON_ObjectSetString(outputNode, "scope", "global");
+        JSON_ObjectSetInt(outputNode, "requested_interior_id", interiorId);
+        JSON_ObjectSetInt(outputNode, "requested_virtual_world_id", virtualWorldId);
         JSON_ObjectSetInt(outputNode, "runtime_object_id", nativeObjectId);
         return true;
     }
