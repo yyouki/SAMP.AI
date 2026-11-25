@@ -89,8 +89,9 @@ test("Pawn mapping action schema accepts a supported global object task and resu
     model_id: 19377,
     position: { x: 100, y: 200, z: 5 },
     rotation: { x: 0, y: 0, z: 90 },
-    interior_id: 0,
-    virtual_world_id: 0,
+    scope: "global",
+    requested_interior_id: 0,
+    requested_virtual_world_id: 0,
     runtime_object_id: 17
   };
 
