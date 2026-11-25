@@ -1,6 +1,6 @@
 # Repository Instructions
 
-Before changing this project, read [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md), [README.md](README.md), and [docs/ROADMAP.md](docs/ROADMAP.md). The project-context document is the durable handoff record; update it in the same commit when architecture, implementation state, validation status, or next steps change.
+Before changing this project, read [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md), [README.md](README.md), [docs/ROADMAP.md](docs/ROADMAP.md), and the relevant installation/runtime guide. The project-context document is the durable handoff record; update it in the same commit when architecture, implementation state, validation status, or next steps change.
 
 Keep the AI core language-independent. Put runtime-specific native calls in adapters and expose them through schema-validated, explicitly advertised capabilities. Every new adapter action must include payload/result schemas, capability advertisement, authorization boundaries, failure semantics, tests, and documentation.
 

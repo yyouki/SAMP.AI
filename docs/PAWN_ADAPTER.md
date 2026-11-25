@@ -2,13 +2,15 @@
 
 **Status:** reference filterscript; the TypeScript action contracts are covered by CI, but the Pawn file has not yet been compiled against a real server/plugin combination or live-tested. Treat it as an integration starter, not a production-ready adapter.
 
-The sample is in `adapters/pawn/samp_ai_adapter.pwn`. It uses the same authenticated task routes as the TypeScript gateway and executes four allowlisted actions:
+The sample is in `adapters/pawn/samp_ai_adapter.pwn`. It uses the same authenticated task routes as the TypeScript gateway and executes six allowlisted actions:
 
 | Action | Result |
 |---|---|
 | `context.get_player_state` | Reads position, facing angle, interior, virtual world, and the current connection-session ID for an online player. |
 | `mapping.create_object` | Creates a server-wide global `CreateObject` object. The native does not scope it to one interior or virtual world. |
 | `mapping.preview_player_object` | Creates or replaces one temporary `CreatePlayerObject` preview visible only to the target player session. |
+| `mapping.begin_player_preview_edit` | Opens the native editor for the exact active private preview and returns immediately. |
+| `mapping.get_player_preview_edit_result` | Reads the editor status and last accepted transform for the matching player session and preview ID. |
 | `mapping.clear_player_preview` | Removes the preview only when player ID, connection session, and preview ID still match. |
 
 It deliberately does not advertise marker, TextDraw, global mapping deletion/update, native-world removal, or arbitrary code execution capabilities.
@@ -25,7 +27,7 @@ The script also uses [pawn-json-parser](https://github.com/NimaBastani/pawn-json
 
 ## Installation
 
-1. Install the version of `https_samp` and the `https_samp.inc` file that match one another. Enable the plugin/component using the instructions for your server runtime.
+1. Install `https_samp` v1.0.0 or a verified compatible release, and use the matching `https_samp.inc`. For SA-MP, load it as a plugin. For open.mp, prefer its native component mode by placing the binary in `components/`; legacy plugin mode is also supported.
 2. Copy `json_parser.inc` from the JSON parser project into the Pawn compiler's include directory.
 3. Copy `adapters/pawn/samp_ai_adapter.example.json` to the game server's `scriptfiles/samp_ai_adapter.json`.
 4. Configure the gateway URL, per-server adapter token, server instance ID, adapter ID, and runtime in that private file. The sample requires `server_clock_is_utc: true` because its protocol timestamps are emitted with a UTC `Z` suffix; ensure the host clock is actually configured and synchronized to UTC before setting this flag. The token must be bound in the gateway authenticator to the exact same `adapter_id` and `server_instance_id`.
@@ -114,6 +116,32 @@ taskQueue.enqueue({
   }
 });
 
+  // Start the native editor for this exact player session and preview.
+  taskQueue.enqueue({
+    serverInstanceId: "your-server-instance-id",
+    adapterId: "sampai-pawn",
+    actionId: "mapping.begin_player_preview_edit",
+    idempotencyKey: "hospital-preview-edit-start-0001",
+    payload: {
+      preview_id: "hospital-preview-wall-01",
+      player_id: 7,
+      player_session_id: "<same session_id>"
+    }
+  });
+
+  // Read this action until its result is completed or cancelled.
+  taskQueue.enqueue({
+    serverInstanceId: "your-server-instance-id",
+    adapterId: "sampai-pawn",
+    actionId: "mapping.get_player_preview_edit_result",
+    idempotencyKey: "hospital-preview-edit-read-0001",
+    payload: {
+      preview_id: "hospital-preview-wall-01",
+      player_id: 7,
+      player_session_id: "<same session_id>"
+    }
+  });
+
 // Clear only this exact preview for the same connection session.
 taskQueue.enqueue({
   serverInstanceId: "your-server-instance-id",
@@ -145,12 +173,16 @@ taskQueue.enqueue({
 });
 ```
 
-The action contracts are exported from `src/adapters/pawn/register-pawn-actions.ts`. The adapter handshake advertises exactly `context.player_state`, `mapping.create_object`, `mapping.preview_player_object`, and `mapping.clear_player_preview`; the queue checks those capabilities before dispatch.
+The action contracts are exported from `src/adapters/pawn/register-pawn-actions.ts`. The adapter handshake advertises exactly `context.player_state`, `mapping.create_object`, `mapping.preview_player_object`, `mapping.clear_player_preview`, `mapping.begin_player_preview_edit`, and `mapping.get_player_preview_edit_result`; the queue checks those capabilities before dispatch.
 
 ## Runtime behavior and limitations
 
 - The filterscript sends `adapter.hello`, polls `GET /v1/adapters/tasks/next` every 1.5 seconds, and sends an authenticated heartbeat every 15 seconds.
 - `CreatePlayerObject` previews are visible only to the targeted player. The adapter keeps at most one preview per player at a time; a successfully created replacement supersedes the previous preview.
+- `mapping.begin_player_preview_edit` opens the native `EditPlayerObject` GUI. `OnPlayerEditObject` captures the final transform or restores the previous accepted transform on cancel.
+- `mapping.get_player_preview_edit_result` is a separate task. It reports `ready`, `editing`, `completed`, `cancelled`, or `not_found`; no HTTP task lease is held while the player interacts with the GUI.
+- The core-side `MappingPreviewEditOrchestrator` polls with a configured limit, creates an in-memory draft revision only for `completed`, and requests separate approval. It does not publish the draft automatically. See [Mapping Preview Editor](MAPPING_PREVIEW_EDITOR.md).
+- Re-preview, clear, disconnect, or filterscript unload invalidates the editor state. The state is in memory only.
 - The preview payload includes `player_session_id`, returned by `context.get_player_state`. This prevents a delayed task for a disconnected player from applying to a different person who later receives the same player ID.
 - The filterscript destroys tracked previews on `OnPlayerDisconnect` and on filterscript unload. `mapping.clear_player_preview` also requires the matching preview ID and session ID; stale clear tasks cannot delete a newer preview.
 - Its UTC timestamps rely on the host clock being correctly configured to UTC. The config flag is an operator assertion, not an automatic timezone detector.
@@ -161,7 +193,7 @@ The action contracts are exported from `src/adapters/pawn/register-pawn-actions.
 - The sample accepts only requests with `interior_id: 0` and `virtual_world_id: 0` as a conservative precondition. **This does not scope the created object to those values.** `CreateObject` creates a global server object; it has no player/interior/virtual-world selector. The result therefore reports `scope: "global"` and echoes the requested context under `requested_interior_id` / `requested_virtual_world_id`. Do not use this action when the object must be isolated to a particular interior or virtual world. A future adapter action must use player-specific objects or a runtime/streamer integration with tested context scoping.
 - It caps its own create operations at 400 per filterscript lifetime. That counter resets when the filterscript reloads and is not a durable object inventory. The runtime's native object pool can also impose its own limit.
 - `runtime_object_id` is the numeric handle returned by `CreateObject`; `object_id` remains the project's logical object identifier.
-- It does not implement task lease renewal, mapping inspection/update/delete, object streaming, TextDraw, native-world removal, project persistence, durable preview state, or undo/redo.
+- It does not implement task lease renewal, mapping inspection/update/delete, object streaming, TextDraw, native-world removal, durable project/revision storage, durable preview/editor state, or undo/redo.
 - Keep the filterscript loaded continuously while tasks are in flight. Restarting or reloading during an operation can leave the queue with an unknown outcome; inspect server state before re-enabling mutations.
 
 For a production adapter, add durable task/operation storage, a recoverable mapping-object index, bounded per-tick native work, object catalog validation, runtime-aware interior/virtual-world support, explicit compensation, and integration tests against the exact SA-MP/open.mp runtime and plugin versions being deployed.

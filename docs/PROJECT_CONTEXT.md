@@ -33,6 +33,8 @@ Source files:
 
 - Pawn filterscript: `adapters/pawn/samp_ai_adapter.pwn`
 - Action contracts: `src/adapters/pawn/register-pawn-actions.ts`
+- Core editor orchestration: `src/mapping/preview-edit-orchestrator.ts`
+- Orchestration tests: `test/mapping-preview-edit-orchestrator.test.ts`
 - Contract tests: `test/pawn-adapter.test.ts`
 - Integration guide: `docs/PAWN_ADAPTER.md`
 
@@ -54,6 +56,14 @@ The filterscript advertises six capabilities/actions:
 - A result read reports one of `ready`, `editing`, `completed`, `cancelled`, or `not_found`.
 - The edit callback is deliberately decoupled from the HTTP task lifecycle. The begin task completes promptly; the core enqueues a separate read task to inspect the eventual result.
 - Only a `completed` transform is a candidate for the next draft revision. It is not approval and it does not create a global object.
+
+## Core preview-edit orchestration
+
+`MappingPreviewEditOrchestrator` receives a trusted `ExecutionContext`, an adapter task queue/action registry, a permission engine, a draft revision store, and an approval-request port. It authorizes `mapping.edit`, starts the adapter editor, waits for short-lived tasks, polls edit state using bounded cadence/attempts, and creates a new revision only when status is `completed`. `cancelled`, `not_found`, and `timed_out` return without a revision or approval request.
+
+Applying is a distinct `enqueueApprovedApply` call. It requires `mapping.apply`, a verified approval receipt bound to tool ID `mapping.apply_draft`, the exact revision content hash, server, and project. It also refuses interior/virtual-world values other than 0/0 for the current Pawn global `CreateObject` action. The method only enqueues the action; it does not synchronously apply it.
+
+The provided `InMemoryMappingDraftRevisionStore` is a reference/test implementation. `MappingDraftRevisionStore` and `MappingApprovalRequestPort` are interfaces that a real application must implement with durable storage and a user-facing approval workflow. Request deduplication in the orchestrator is process-local.
 - Re-preview, clear, disconnect, or filterscript unload invalidates the transient edit state. Player IDs are not sufficient identity; always pair them with the current `session_id` and logical `preview_id`.
 
 ## Non-negotiable safety and correctness invariants
@@ -84,10 +94,12 @@ The filterscript advertises six capabilities/actions:
 ## Validation status and limitations
 
 - CI validates TypeScript type-checking, unit tests, and TypeScript build.
+- Latest verified editor-orchestration CI: [run #45640155561](https://github.com/yyouki/samp-ai/actions/runs/45640155561), commit `8942d4e34ecb73eb19bf8620ea14f9d43024d567` — type-check succeeded, 65 tests passed / 0 failed, and build succeeded.
 - Latest verified CI for the interactive preview-editor implementation: [run #45623852494](https://github.com/yyouki/SAMP.AI/actions/runs/45623852494), commit `bf3064878975e370de89f8ffddb09372268e926a` — type-check succeeded, 57 tests passed / 0 failed, and build succeeded.
 - Pawn contract tests validate the TypeScript schemas and task queue behavior; they do not compile Pawn.
 - The Pawn filterscript has **not** been compiled against a real SA-MP/open.mp server include set or live-tested with `https_samp` and `pawn-json-parser`. Treat it as a reference implementation only.
-- No production authenticator, persistent queue/database, durable operation dedupe, signed approval receipt store, recoverable object index, or installer is complete.
+- No production authenticator, persistent queue/database, durable operation dedupe, signed approval receipt store, recoverable object index, packaged installer, or complete runnable AI/dashboard host application is complete.
+- Preview revision storage and approval-request integration are interfaces; the included revision store is in-memory only. The gateway has no public admin endpoint for enqueuing tasks.
 - Verify the latest Actions run and repository head before reporting a test result. Do not reuse an old CI result after changing code.
 
 ## Working conventions for future sessions
@@ -103,9 +115,9 @@ The filterscript advertises six capabilities/actions:
 
 ## Next recommended work
 
-1. Build a core-side editor orchestration workflow: authorize the reviewer, begin editing, poll edit state with bounded cadence/timeouts, create a new draft revision only for `completed`, and request explicit approval before any global apply action. Handle `cancelled` and `not_found` as non-apply outcomes.
-2. Compile the Pawn reference script using the exact target server/compiler/plugin versions and fix any incompatibilities; then live-test player connect/disconnect, preview replacement, edit final/cancel, filterscript unload, and uncertain HTTP result handling.
-3. Add durable task storage and server-side operation deduplication before production mutation use.
-4. Add production authentication, signed approvals, persistent audit events, and a recoverable server-object inventory.
-5. Continue Mapping MVP with catalog provenance, bounded object batches, revisions, and compensation.
+1. Compile the Pawn reference filterscript against the exact target SA-MP/open.mp compiler, includes, and plugin binaries; then live-test connection lifecycle, preview replacement, edit final/cancel, unload, and uncertain HTTP results.
+2. Build a runnable backend host and secure admin interface that wires the AI agent, trusted actor resolver, task queue, editor orchestrator, and approval request/verification ports.
+3. Replace in-memory queue, adapter registry, revision store, and operation deduplication with durable transactional storage.
+4. Add production credentials, signed approval receipts, persistent audit events, and a recoverable server-object inventory.
+5. Continue Mapping MVP with catalog provenance, bounded object batches, undo/restore for server-created objects, and compensation.
 

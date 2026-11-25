@@ -70,6 +70,7 @@ This roadmap prioritizes a safe, testable end-to-end path before adding more ada
 - [ ] Validate model IDs, coordinate ranges, transforms, operation counts, and duplicates.
 - [x] Add a first per-player preview/ghost-object path supported by the Pawn adapter.
 - [x] Let an authorized reviewer move/rotate a private preview using the native object editor; keep the edited transform as a draft until a separate approval step.
+- [x] Add core orchestration with bounded edit-result polling, session/preview binding, draft revision creation on completion only, and an explicit approval gate before global apply.
 - [ ] Add revisions, undo, and restore for server-created objects.
 - [ ] Add explicit native-world removal history and reconnect/proxy compensation workflows; never claim exact native restore without runtime support.
 
