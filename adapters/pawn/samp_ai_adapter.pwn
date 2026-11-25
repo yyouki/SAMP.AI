@@ -8,7 +8,6 @@
 
 #include <a_samp>
 
-#define JSON_MAX_NODES 4096
 #define JSON_MAX_VALUE_LEN 512
 #define JSON_MAX_STRING_LEN 8192
 #define JSON_SERIALIZE_BUFFER 8192
