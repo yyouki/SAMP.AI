@@ -1,0 +1,7 @@
+{
+  "gateway_base_url": "https://samp-ai-gateway.example.com",
+  "adapter_token": "REPLACE_WITH_A_UNIQUE_SERVER_ADAPTER_TOKEN",
+  "server_instance_id": "your-server-instance-id",
+  "adapter_id": "sampai-pawn",
+  "runtime": "open.mp"
+}
