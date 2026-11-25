@@ -9,3 +9,8 @@ Treat model output as untrusted. Enforce actor/project permissions and explicit 
 Do not claim the Pawn reference filterscript compiles or works on a live server unless it has been compiled and tested against the exact runtime, compiler, include, and plugin versions. TypeScript CI does not validate Pawn syntax or runtime behavior.
 
 Run `npm run typecheck`, `npm test`, and `npm run build` (or inspect the matching current GitHub Actions run) after changes. Update `docs/ROADMAP.md` and `docs/PROJECT_CONTEXT.md` as part of the feature change.
+
+
+## Documentation languages and releases
+
+Keep English and Bahasa Indonesia documentation pages synchronized. Every page under docs/ should link to its counterpart, language selector, and documentation index. Update docs/INDEX.md, docs/id/INDEX.md, and docs/PROJECT_CONTEXT.md when adding a page or language. Validate relative links. Never claim a release has been published until a version tag has completed the release workflow successfully.

@@ -1,5 +1,7 @@
 # Self-Expanding Skills
 
+> **Language:** [English](SELF_EXPANDING_SKILLS.md) | [Bahasa Indonesia](id/SELF_EXPANDING_SKILLS.md) · [Documentation index](INDEX.md) · [Language options](LANGUAGES.md)
+
 ## 1. Purpose
 
 SAMP.AI should recognize when a workflow is missing, design a candidate skill, test it against controlled examples, and propose it for installation. This lets the assistant grow beyond the initial mapping and TextDraw domains.

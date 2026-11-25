@@ -1,5 +1,7 @@
 # Model Providers
 
+> **Language:** [English](PROVIDERS.md) | [Bahasa Indonesia](id/PROVIDERS.md) · [Documentation index](INDEX.md) · [Language options](LANGUAGES.md)
+
 ## Provider-neutral design
 
 SAMP.AI Core depends on the `ModelProvider` interface in `src/agent/contracts.ts`. Providers convert that common contract into a vendor-specific API request and convert the response back into `ModelProviderResponse`.

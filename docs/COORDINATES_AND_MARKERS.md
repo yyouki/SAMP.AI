@@ -1,5 +1,7 @@
 # Coordinate and Marker Workflow
 
+> **Language:** [English](COORDINATES_AND_MARKERS.md) | [Bahasa Indonesia](id/COORDINATES_AND_MARKERS.md) · [Documentation index](INDEX.md) · [Language options](LANGUAGES.md)
+
 This document defines how SAMP.AI should understand positions, calculate layouts, and mark proposed locations in an SA-MP/open.mp environment.
 
 ## 1. Goal

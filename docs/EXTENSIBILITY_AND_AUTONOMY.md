@@ -1,5 +1,7 @@
 # Extensibility and AI Autonomy
 
+> **Language:** [English](EXTENSIBILITY_AND_AUTONOMY.md) | [Bahasa Indonesia](id/EXTENSIBILITY_AND_AUTONOMY.md) · [Documentation index](INDEX.md) · [Language options](LANGUAGES.md)
+
 ## 1. Product philosophy
 
 SAMP.AI should not be artificially limited to mapping and TextDraw. Those are initial, concrete skills for validating the architecture—not the boundary of what the assistant may eventually help with.

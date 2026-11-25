@@ -81,18 +81,19 @@ download "https://raw.githubusercontent.com/NimaBastani/pawn-json-parser/$JSON_P
 # inside the include itself so it is available regardless of include order.
 PARSER_PATCHED="$DOWNLOAD_DIR/json_parser.patched.inc"
 awk '
-  /^#if !defined JSON_MAX_NODES$/ {
-    print "#define JSON_MAX_NODES 4096"
-    skip = 1
-    next
+  /#if !defined JSON_MAX_NODES/ { skip = 1; next }
+  skip && /#endif/ { skip = 0; next }
+  !skip {
+    gsub(/JSON_MAX_NODES/, "4096")
+    print
   }
-  skip && /^#endif$/ {
-    skip = 0
-    next
-  }
-  !skip { print }
 ' "$INCLUDE_ROOT/json_parser.inc" > "$PARSER_PATCHED"
 mv "$PARSER_PATCHED" "$INCLUDE_ROOT/json_parser.inc"
+if grep -q "JSON_MAX_NODES" "$INCLUDE_ROOT/json_parser.inc"; then
+  echo "::error::Failed to patch JSON_MAX_NODES in the pinned JSON parser."
+  exit 1
+fi
+echo "Patched JSON parser node pool to 4096 entries."
 
 echo "Preparing open.mp standard includes and SA-MP compatibility mode..."
 OMP_INCLUDE="$BUILD_ROOT/includes-openmp"
@@ -111,11 +112,27 @@ fi
 compile_target() {
   local target="$1"
   local includes="$2"
-  shift 2
+  local target_mode="$3"
   local target_dir="$OUTPUT_DIR/$target"
   local output="$target_dir/samp_ai_adapter.amx"
+  local generated_source="$BUILD_ROOT/$target-samp_ai_adapter.pwn"
 
   mkdir -p "$target_dir"
+  : > "$generated_source"
+  # Both targets use the open.mp standard include package's SA-MP-compatible
+  # native surface. The runtime target changes only the output artifact name.
+  printf '#define OPEN_MP_NO_WRAPPER_WARNING\n#define SAMP_AI_OPEN_MP\n' > "$generated_source"
+  cat "$SOURCE" >> "$generated_source"
+
+  echo "Generated target preamble for $target:"
+  sed -n '1,4p' "$generated_source"
+  echo "Generated editor callback for $target:"
+  grep -n -A8 -B2 "OnPlayerEditObject" "$generated_source" | head -n 24 || true
+  echo "Included callback prototypes for $target:"
+  grep -R -n "forward OnPlayerEditObject" "$includes" "$INCLUDE_ROOT" 2>/dev/null | head -n 8 || true
+  echo "EDIT_RESPONSE macro definitions for $target:"
+  grep -R -n "#define EDIT_RESPONSE" "$includes" "$INCLUDE_ROOT" 2>/dev/null | head -n 8 || true
+
   echo "Compiling Pawn adapter for $target..."
   "$PAWNCC" \
     "-i$includes" \
@@ -123,9 +140,8 @@ compile_target() {
     -d0 \
     -O2 \
     -Z \
-    "$@" \
     "-o$output" \
-    "$SOURCE"
+    "$generated_source"
 
   if [[ ! -s "$output" ]]; then
     echo "::error::Compiler did not produce $output"
@@ -134,16 +150,17 @@ compile_target() {
   echo "Built $output ($(stat -c '%s' "$output") bytes)"
 }
 
-# SAMP_COMPAT enables the legacy a_samp surface and untagged callback prototypes.
-compile_target "samp" "$INCLUDE_ROOT/openmp" "-DSAMP_COMPAT"
-compile_target "openmp" "$INCLUDE_ROOT/openmp" "-DSAMP_AI_OPEN_MP"
+# SA-MP uses the open.mp standard include package in legacy compatibility mode.
+# The temporary preamble selects the matching callback prototype before includes load.
+compile_target "samp" "$INCLUDE_ROOT/openmp" "samp"
+compile_target "openmp" "$INCLUDE_ROOT/openmp" "openmp"
 
 
 cat > "$OUTPUT_DIR/build-info.txt" <<EOF
 SAMP.AI Pawn build provenance
 Source commit: ${GITHUB_SHA:-local}
 Pawn compiler: openmultiplayer/compiler v$PAWN_COMPILER_VERSION
-SA-MP target: openmultiplayer/omp-stdlib@$OMP_STDLIB_SHA with SAMP_COMPAT
+SA-MP target: openmultiplayer/omp-stdlib@$OMP_STDLIB_SHA (SA-MP-compatible native surface)
 open.mp target: openmultiplayer/omp-stdlib@$OMP_STDLIB_SHA
 HTTPS include: https_samp $HTTPS_SAMP_VERSION
 JSON include: pawn-json-parser@$JSON_PARSER_SHA

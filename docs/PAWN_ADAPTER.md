@@ -197,3 +197,8 @@ The action contracts are exported from `src/adapters/pawn/register-pawn-actions.
 - Keep the filterscript loaded continuously while tasks are in flight. Restarting or reloading during an operation can leave the queue with an unknown outcome; inspect server state before re-enabling mutations.
 
 For a production adapter, add durable task/operation storage, a recoverable mapping-object index, bounded per-tick native work, object catalog validation, runtime-aware interior/virtual-world support, explicit compensation, and integration tests against the exact SA-MP/open.mp runtime and plugin versions being deployed.
+
+
+## GitHub Actions build
+
+The repository workflow compiles this filterscript as separate SA-MP and open.mp targets using the pinned toolchain in `scripts/build-pawn.sh`. Download the successful workflow artifact `samp-ai-pawn-build` for temporary builds, or use the versioned files attached to a GitHub Release. Compilation is not a substitute for live runtime testing. See [Build and GitHub Releases](RELEASING.md) and [Installation](INSTALLATION.md).

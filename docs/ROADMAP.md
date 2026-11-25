@@ -14,7 +14,8 @@ This roadmap prioritizes a safe, testable end-to-end path before adding more ada
 - [x] Add initial extension manifest, skill, and tool-binding schemas.
 - [x] Add machine-readable schemas for protocol messages, adapter handshake, and coordinates.
 - [x] Add TypeScript protocol validator and valid/invalid message tests.
-- [x] Add CI workflow for source/test type-checking, unit tests, and TypeScript build.
+- [x] Add CI workflow for TypeScript type-checking, unit tests, and build.
+- [x] Add pinned-toolchain Pawn compilation for SA-MP/open.mp and tag-triggered GitHub Release packaging.
 - [x] Add reusable JSON Schema validation for extension schemas.
 - [x] Add an adapter registry that binds hello messages to authenticated identities, tracks capabilities, and expires stale registrations.
 - [x] Add an initial authenticated HTTP gateway for adapter hello, heartbeat, inspection, and disconnect.
@@ -138,3 +139,10 @@ A feature is not complete until it has:
 4. tests, including failure cases;
 5. user-facing documentation;
 6. clear preview / audit behavior for mutating actions.
+
+
+## Documentation languages
+
+- [x] Add English and Bahasa Indonesia documentation indexes and language selector.
+- [x] Link localized Markdown pages with their counterpart and documentation index.
+- [ ] Add further languages when translations are reviewed and maintained.

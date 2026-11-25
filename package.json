@@ -11,7 +11,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "test": "tsx --test test/*.test.ts",
-    "test:watch": "tsx --test --watch test/*.test.ts"
+    "test:watch": "tsx --test --watch test/*.test.ts",
+    "docs:check": "node scripts/check-doc-links.mjs"
   },
   "dependencies": {
     "ajv": "^8.17.1",

@@ -172,13 +172,8 @@ stock SampAI_StorePreviewTransform(playerid, Float:x, Float:y, Float:z, Float:rx
     return 1;
 }
 
-#if defined SAMP_AI_OPEN_MP
 public OnPlayerEditObject(playerid, playerobject, objectid, EDIT_RESPONSE:response,
-    Float:x, Float:y, Float:z, Float:rx, Float:ry, Float:rz)
-#else
-public OnPlayerEditObject(playerid, playerobject, objectid, response,
-    Float:x, Float:y, Float:z, Float:rx, Float:ry, Float:rz)
-#endif
+    Float:fX, Float:fY, Float:fZ, Float:fRotX, Float:fRotY, Float:fRotZ)
 {
     // Only consume callbacks for this filterscript's active player-object preview.
     if (playerid < 0 || playerid >= MAX_PLAYERS || !playerobject ||
@@ -189,22 +184,14 @@ public OnPlayerEditObject(playerid, playerobject, objectid, response,
         return 0;
     }
 
-#if defined SAMP_AI_OPEN_MP
-    if (response == EDIT_RESPONSE_FINAL)
-#else
-    if (response == _:EDIT_RESPONSE_FINAL)
-#endif
+if (response == EDIT_RESPONSE_FINAL)
     {
-        SetPlayerObjectPos(playerid, objectid, x, y, z);
-        SetPlayerObjectRot(playerid, objectid, rx, ry, rz);
-        SampAI_StorePreviewTransform(playerid, x, y, z, rx, ry, rz);
+        SetPlayerObjectPos(playerid, objectid, fX, fY, fZ);
+        SetPlayerObjectRot(playerid, objectid, fRotX, fRotY, fRotZ);
+        SampAI_StorePreviewTransform(playerid, fX, fY, fZ, fRotX, fRotY, fRotZ);
         g_SampAiPreviewEditState[playerid] = 2;
     }
-#if defined SAMP_AI_OPEN_MP
-    else if (response == EDIT_RESPONSE_CANCEL)
-#else
-    else if (response == _:EDIT_RESPONSE_CANCEL)
-#endif
+else if (response == EDIT_RESPONSE_CANCEL)
     {
         // The GUI may have moved the object before cancel; restore the last accepted transform.
         SetPlayerObjectPos(

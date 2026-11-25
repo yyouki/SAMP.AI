@@ -1,5 +1,7 @@
 # Mock Game Adapter
 
+> **Language:** [English](MOCK_GAME_ADAPTER.md) | [Bahasa Indonesia](id/MOCK_GAME_ADAPTER.md) · [Documentation index](INDEX.md) · [Language options](LANGUAGES.md)
+
 The Mock Game Adapter is a deterministic in-memory runtime for testing the adapter contract without connecting to SA-MP or open.mp. It uses the production-shaped `AdapterActionRegistry` and `AdapterTaskQueue` interfaces, claims leased tasks, executes a supported action, and submits a result through the queue's schema validation.
 
 ## What it simulates
