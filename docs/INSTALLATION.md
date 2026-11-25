@@ -66,7 +66,13 @@ Download the binary and include that match the server OS from the [https_samp v1
 
 The release notes state that the same plugin binary supports SA-MP and open.mp; open.mp supports both native component and legacy plugin loading. Follow the exact configuration instructions bundled with the plugin release if they change.
 
-## 3. Compile the Pawn filterscript
+## 3. Download a compiled filterscript from GitHub Actions
+
+Open the repository's **Actions** tab, select the latest successful CI and Release workflow run, and download the `samp-ai-pawn-build` artifact. It contains separate `samp/` and `openmp/` folders and `build-info.txt`.
+
+Workflow artifacts are temporary and expire according to retention settings. For versioned distribution, use the assets attached to a GitHub Release created from a `v*` tag. See [Build and GitHub Releases](RELEASING.md).
+
+## 4. Compile the Pawn filterscript
 
 From the repository, compile:
 
@@ -78,7 +84,7 @@ Use the compiler and base includes that match your game server, plus `https_samp
 
 The repository's TypeScript CI does not compile Pawn. Treat compiler output and a live server test as separate validation requirements.
 
-## 4. Configure the private adapter credentials
+## 5. Configure the private adapter credentials
 
 Copy `adapters/pawn/samp_ai_adapter.example.json` to the server's `scriptfiles/samp_ai_adapter.json`.
 
@@ -101,7 +107,7 @@ The sample requires `gateway_base_url` to use HTTPS. Its protocol timestamps inc
 
 The live config file is ignored by Git. Keep it readable only by the server process/operator. Never commit the real token.
 
-## 5. Load it in SA-MP
+## 6. Load it in SA-MP
 
 Stop the SA-MP server before copying files or editing its configuration. Put the filterscript at `filterscripts/samp_ai_adapter.amx` and the transport binary in `plugins/`.
 
@@ -115,7 +121,7 @@ For the transport, the published release provides `https_samp.dll` for Windows a
 
 Restart the server and inspect the console for the filterscript's startup and authenticated registration messages.
 
-## 6. Load it in open.mp
+## 7. Load it in open.mp
 
 Stop the server before copying files or editing `config.json`. Put `samp_ai_adapter.amx` in `filterscripts/`.
 
@@ -158,7 +164,7 @@ Do not install the same `https_samp` binary in both `components/` and `plugins/`
 
 The open.mp server configuration documents `pawn.side_scripts` for filterscripts and `pawn.legacy_plugins` for legacy `.dll`/`.so` plugins. See the official [open.mp config.json reference](https://open.mp/docs/server/config.json).
 
-## 7. Verify the connection
+## 8. Verify the connection
 
 1. Start the backend host application and verify its `/health` endpoint.
 2. Start the game server.

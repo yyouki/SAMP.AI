@@ -1,5 +1,7 @@
 # AI Behavior, Collaboration, and Permissions
 
+> **Language:** [English](AI_BEHAVIOR.md) | [Bahasa Indonesia](id/AI_BEHAVIOR.md) · [Documentation index](INDEX.md) · [Language options](LANGUAGES.md)
+
 ## 1. Product behavior
 
 SAMP.AI should behave like a capable technical teammate for server development. It should be able to:

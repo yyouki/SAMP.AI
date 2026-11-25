@@ -1,5 +1,7 @@
 # Architecture
 
+> **Language:** [English](ARCHITECTURE.md) | [Bahasa Indonesia](id/ARCHITECTURE.md) · [Documentation index](INDEX.md) · [Language options](LANGUAGES.md)
+
 This document describes the intended architecture. It is a design target, not an implementation claim.
 
 ## 1. Design constraints

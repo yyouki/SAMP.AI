@@ -1,5 +1,7 @@
 # Core Implementation
 
+> **Language:** [English](CORE_IMPLEMENTATION.md) | [Bahasa Indonesia](id/CORE_IMPLEMENTATION.md) · [Documentation index](INDEX.md) · [Language options](LANGUAGES.md)
+
 ## Runtime decision
 
 The standalone SAMP.AI Core uses **TypeScript on Node.js 22 or later** for the initial implementation. This is a service/runtime decision only. Gamemodes and server integrations remain language-independent and communicate through the protocol.

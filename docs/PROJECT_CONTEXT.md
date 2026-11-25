@@ -6,7 +6,7 @@ This file is the durable project memory for future development sessions and codi
 
 ## Repository
 
-- Canonical repository: https://github.com/yyouki/SAMP.AI
+- Canonical repository: https://github.com/yyouki/samp-ai
 - Default branch: `main`
 - Package: `samp-ai`, TypeScript ESM, Node.js 22+
 - Product: language-independent AI assistant and extensible tool platform for SA-MP and open.mp server development.
@@ -93,7 +93,7 @@ The provided `InMemoryMappingDraftRevisionStore` is a reference/test implementat
 
 ## Validation status and limitations
 
-- CI validates TypeScript type-checking, unit tests, and TypeScript build.
+- CI validates TypeScript type-checking, unit tests, and TypeScript build, and includes a pinned-toolchain Pawn compile job for SA-MP/open.mp plus a tag-triggered release job.
 - Latest verified editor-orchestration CI: [run #45640155561](https://github.com/yyouki/samp-ai/actions/runs/45640155561), commit `8942d4e34ecb73eb19bf8620ea14f9d43024d567` — type-check succeeded, 65 tests passed / 0 failed, and build succeeded.
 - Latest verified CI for the interactive preview-editor implementation: [run #45623852494](https://github.com/yyouki/SAMP.AI/actions/runs/45623852494), commit `bf3064878975e370de89f8ffddb09372268e926a` — type-check succeeded, 57 tests passed / 0 failed, and build succeeded.
 - Pawn contract tests validate the TypeScript schemas and task queue behavior; they do not compile Pawn.
@@ -120,4 +120,5 @@ The provided `InMemoryMappingDraftRevisionStore` is a reference/test implementat
 3. Replace in-memory queue, adapter registry, revision store, and operation deduplication with durable transactional storage.
 4. Add production credentials, signed approval receipts, persistent audit events, and a recoverable server-object inventory.
 5. Continue Mapping MVP with catalog provenance, bounded object batches, undo/restore for server-created objects, and compensation.
+6. Keep English and Indonesian Markdown pages synchronized through docs/INDEX.md and docs/id/INDEX.md.
 

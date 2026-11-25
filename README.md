@@ -1,10 +1,12 @@
 # SAMP.AI
 
+> **Language:** [English](README.md) | [Bahasa Indonesia](docs/id/README.md) · [Documentation index](docs/INDEX.md) · [Language options](docs/LANGUAGES.md)
+
 > An open-source, language-independent AI assistant for SA-MP and open.mp server development.
 
 SAMP.AI is intended to help server owners and developers design, inspect, preview, and manage in-game content such as map objects and TextDraw interfaces. It is designed as a collaborative assistant: it can propose ideas proactively, but it must discuss uncertain requirements and obtain the required approval before applying changes.
 
-**Project status: Early core scaffold.** The repository contains TypeScript core primitives, protocol/extension schemas, adapter and skill registries, a declarative extension loader, a bounded provider-neutral agent loop, and an optional OpenAI Responses API provider. An in-memory typed adapter task queue and deterministic Mock Game Adapter are included for end-to-end local simulation. Core-side preview-edit orchestration now creates draft revisions and requests explicit approval before any global apply. An initial Pawn reference filterscript supports authenticated task polling, player-state reads, global object creation, session-bound per-player previews, and interactive preview editing, but has not been compiled or live-tested against a server. The repository still has no packaged installer or complete runnable AI/dashboard application. A production-validated open.mp adapter, durable queue/persistent storage, production authentication/approval services, and runtime installer are not implemented yet.
+**Project status: Early core scaffold.** The repository contains TypeScript core primitives, protocol/extension schemas, adapter and skill registries, a declarative extension loader, a bounded provider-neutral agent loop, and an optional OpenAI Responses API provider. An in-memory typed adapter task queue and deterministic Mock Game Adapter are included for end-to-end local simulation. Core-side preview-edit orchestration now creates draft revisions and requests explicit approval before any global apply. An initial Pawn reference filterscript supports authenticated task polling, player-state reads, global object creation, session-bound per-player previews, and interactive preview editing, but has not been compiled or live-tested against a server. The repository still has no packaged installer or complete runnable AI/dashboard application. GitHub Actions validates the TypeScript core and compiles the Pawn reference filterscript for SA-MP and open.mp; version tags are configured to publish a reference bundle after all validation jobs pass. A production-validated open.mp adapter, durable queue/persistent storage, production authentication/approval services, and runtime installer are not implemented yet.
 
 ## Project goals
 
@@ -51,7 +53,7 @@ See [Provider setup](docs/PROVIDERS.md).
 
 The standalone core is initially implemented in TypeScript on Node.js 22 or later. This does not constrain game-mode languages: server integrations remain independent adapters using the versioned protocol.
 
-See [Core Implementation](docs/CORE_IMPLEMENTATION.md) for setup and implementation boundaries. The [Mock Game Adapter](docs/MOCK_GAME_ADAPTER.md) guide explains deterministic simulations; the [Pawn Adapter](docs/PAWN_ADAPTER.md) guide covers the unvalidated reference filterscript and its optional dependencies. Continuous integration runs type-checking, tests, and the TypeScript build on Node.js 22.
+See [Core Implementation](docs/CORE_IMPLEMENTATION.md) for setup and implementation boundaries. The [Mock Game Adapter](docs/MOCK_GAME_ADAPTER.md) guide explains deterministic simulations; the [Pawn Adapter](docs/PAWN_ADAPTER.md) guide covers the unvalidated reference filterscript and its optional dependencies. Continuous integration runs type-checking, tests, and the TypeScript build on Node.js 22, plus pinned-toolchain Pawn builds for SA-MP and open.mp.
 
 ## High-level architecture
 
@@ -103,11 +105,15 @@ The AI may discuss, inspect, plan, and prepare drafts according to the user's pe
 
 ## Documentation
 
+Choose [English](README.md) or [Bahasa Indonesia](docs/id/README.md). The complete navigation is in the [documentation index](docs/INDEX.md).
+
 - [Architecture](docs/ARCHITECTURE.md)
 - [Universal protocol](docs/PROTOCOL.md)
 - [Core implementation](docs/CORE_IMPLEMENTATION.md)
 - [HTTP adapter gateway](docs/ADAPTER_GATEWAY.md)
 - [Installation guide (reference integration)](docs/INSTALLATION.md)
+- [Build and GitHub Releases](docs/RELEASING.md)
+- [Language options and documentation index](docs/LANGUAGES.md)
 - [Pawn adapter reference](docs/PAWN_ADAPTER.md)
 - [Mapping preview editor orchestration](docs/MAPPING_PREVIEW_EDITOR.md)
 - [Project context and durable handoff](docs/PROJECT_CONTEXT.md)

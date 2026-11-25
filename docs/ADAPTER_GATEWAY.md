@@ -1,5 +1,7 @@
 # HTTP Adapter Gateway
 
+> **Language:** [English](ADAPTER_GATEWAY.md) | [Bahasa Indonesia](id/ADAPTER_GATEWAY.md) · [Documentation index](INDEX.md) · [Language options](LANGUAGES.md)
+
 ## Purpose
 
 The gateway is a machine-to-machine transport for authenticated adapter registration, liveness, and execution of **pre-registered typed tasks**. It is not a public player API and it does not accept arbitrary code or arbitrary action names.
