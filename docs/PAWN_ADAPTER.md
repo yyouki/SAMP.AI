@@ -26,7 +26,7 @@ The script also uses [pawn-json-parser](https://github.com/NimaBastani/pawn-json
 1. Install the version of `https_samp` and the `https_samp.inc` file that match one another. Enable the plugin/component using the instructions for your server runtime.
 2. Copy `json_parser.inc` from the JSON parser project into the Pawn compiler's include directory.
 3. Copy `adapters/pawn/samp_ai_adapter.example.json` to the game server's `scriptfiles/samp_ai_adapter.json`.
-4. Configure the gateway URL, per-server adapter token, server instance ID, adapter ID, and runtime in that private file. The token must be bound in the gateway authenticator to the exact same `adapter_id` and `server_instance_id`.
+4. Configure the gateway URL, per-server adapter token, server instance ID, adapter ID, and runtime in that private file. The sample requires `server_clock_is_utc: true` because its protocol timestamps are emitted with a UTC `Z` suffix; ensure the host clock is actually configured and synchronized to UTC before setting this flag. The token must be bound in the gateway authenticator to the exact same `adapter_id` and `server_instance_id`.
 5. Compile `adapters/pawn/samp_ai_adapter.pwn` with the installed includes and load the resulting filterscript.
 6. Configure an HTTPS reverse proxy in front of the Node gateway. The sample rejects a non-HTTPS gateway URL and the gateway itself is plain HTTP unless TLS is terminated by a trusted proxy.
 
@@ -106,6 +106,7 @@ The action contracts are exported from `src/adapters/pawn/register-pawn-actions.
 ## Runtime behavior and limitations
 
 - The filterscript sends `adapter.hello`, polls `GET /v1/adapters/tasks/next` every 1.5 seconds, and sends an authenticated heartbeat every 15 seconds.
+- Its UTC timestamps rely on the host clock being correctly configured to UTC. The config flag is an operator assertion, not an automatic timezone detector.
 - It handles one task at a time. The result is posted with the lease token returned by the claim endpoint.
 - The result callback must confirm HTTP 200 before the adapter polls another task. If result submission is uncertain after a game-side mutation, the adapter pauses instead of processing another task.
 - `mapping.create_object` is declared non-idempotent with manual compensation. If its lease expires, the queue will not automatically run it again. An operator must inspect the game state before deciding what to do.
