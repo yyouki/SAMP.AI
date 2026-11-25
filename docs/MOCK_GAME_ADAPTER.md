@@ -28,7 +28,7 @@ import {
   createDefaultSchemaValidator,
   registerMockGameActions,
   registerMockGameAdapter
-} from "samp-ai";
+} from "../src/index.js";
 
 const serverInstanceId = "local-test-server";
 const adapterId = "sampai-mock";
