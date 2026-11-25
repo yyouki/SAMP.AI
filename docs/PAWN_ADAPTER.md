@@ -7,7 +7,7 @@ The sample is in `adapters/pawn/samp_ai_adapter.pwn`. It uses the same authentic
 | Action | Result |
 |---|---|
 | `context.get_player_state` | Reads position, facing angle, interior, and virtual world for an online player. |
-| `mapping.create_object` | Creates a global `CreateObject` object in interior 0 / virtual world 0. |
+| `mapping.create_object` | Creates a server-wide global `CreateObject` object. The native does not scope it to one interior or virtual world. |
 
 It deliberately does not advertise marker, TextDraw, delete, native-world removal, or arbitrary code execution capabilities.
 
@@ -111,7 +111,7 @@ The action contracts are exported from `src/adapters/pawn/register-pawn-actions.
 - The result callback must confirm HTTP 200 before the adapter polls another task. If result submission is uncertain after a game-side mutation, the adapter pauses instead of processing another task.
 - `mapping.create_object` is declared non-idempotent with manual compensation. If its lease expires, the queue will not automatically run it again. An operator must inspect the game state before deciding what to do.
 - The task includes `operation_id`, but this starter does not persist a durable deduplication ledger. The current queue and adapter state are in memory.
-- The sample accepts only `interior_id: 0` and `virtual_world_id: 0`. The global `CreateObject` native does not provide an interior/world argument in this adapter implementation. Other contexts are rejected rather than silently placing an object in the wrong world.
+- The sample accepts only requests with `interior_id: 0` and `virtual_world_id: 0` as a conservative precondition. **This does not scope the created object to those values.** `CreateObject` creates a global server object; it has no player/interior/virtual-world selector. The result therefore reports `scope: "global"` and echoes the requested context under `requested_interior_id` / `requested_virtual_world_id`. Do not use this action when the object must be isolated to a particular interior or virtual world. A future adapter action must use player-specific objects or a runtime/streamer integration with tested context scoping.
 - It caps its own create operations at 400 per filterscript lifetime. That counter resets when the filterscript reloads and is not a durable object inventory. The runtime's native object pool can also impose its own limit.
 - `runtime_object_id` is the numeric handle returned by `CreateObject`; `object_id` remains the project's logical object identifier.
 - It does not implement task lease renewal, mapping inspection/update/delete, object streaming, preview markers, TextDraw, native-world removal, project persistence, or undo/redo.
