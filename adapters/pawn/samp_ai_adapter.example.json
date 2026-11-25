@@ -3,5 +3,6 @@
   "adapter_token": "REPLACE_WITH_A_UNIQUE_SERVER_ADAPTER_TOKEN",
   "server_instance_id": "your-server-instance-id",
   "adapter_id": "sampai-pawn",
-  "runtime": "open.mp"
+  "runtime": "open.mp",
+  "server_clock_is_utc": true
 }
