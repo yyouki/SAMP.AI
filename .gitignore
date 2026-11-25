@@ -6,3 +6,6 @@ coverage/
 !.env.example
 *.log
 .DS_Store
+
+# Per-server adapter credentials (copy the example config and keep this file private).
+scriptfiles/samp_ai_adapter.json
