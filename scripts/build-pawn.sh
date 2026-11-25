@@ -136,7 +136,7 @@ compile_target() {
 }
 
 # SAMP_COMPAT enables the legacy a_samp surface and untagged callback prototypes.
-compile_target "samp" "$INCLUDE_ROOT/openmp" "-DSAMP_COMPAT" "-DSAMP_AI_OPEN_MP"
+compile_target "samp" "$INCLUDE_ROOT/openmp" "-DSAMP_COMPAT" "-DSAMP_AI_OPEN_MP" "-DSAMP_AI_OPEN_MP"
 compile_target "openmp" "$INCLUDE_ROOT/openmp" "-DSAMP_AI_OPEN_MP"
 
 
