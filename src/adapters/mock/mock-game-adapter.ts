@@ -131,6 +131,7 @@ const objectResultSchema = objectSchema({
   object_id: entityIdSchema,
   project_id: projectIdSchema,
   model_id: { type: "integer", minimum: 1, maximum: 65535 },
+  runtime_object_id: { type: "integer", minimum: 0, maximum: 65535 },
   ...transformResultProperties
 });
 
