@@ -288,6 +288,9 @@ public SampAI_OnHttpResponse(index, response[], status, error)
             return 1;
         }
 
+        // Pause polling until this claimed task has a confirmed result.
+        // A malformed response must not make the adapter claim a second task.
+        g_SampAiTaskPending = true;
         SampAI_HandleTask(response);
         return 1;
     }
@@ -529,15 +532,15 @@ stock bool:SampAI_ReadVector(rootNode, const prefix[], &Float:x, &Float:y, &Floa
 
     format(path, sizeof(path), "%s.x", prefix);
     node = JSON_GetByPath(rootNode, path);
-    if (node == JSON_INVALID_NODE || !JSON_NodeToFloat(node, x)) return false;
+    if (node == JSON_INVALID_NODE || !JSON_GetFloat(node, x)) return false;
 
     format(path, sizeof(path), "%s.y", prefix);
     node = JSON_GetByPath(rootNode, path);
-    if (node == JSON_INVALID_NODE || !JSON_NodeToFloat(node, y)) return false;
+    if (node == JSON_INVALID_NODE || !JSON_GetFloat(node, y)) return false;
 
     format(path, sizeof(path), "%s.z", prefix);
     node = JSON_GetByPath(rootNode, path);
-    if (node == JSON_INVALID_NODE || !JSON_NodeToFloat(node, z)) return false;
+    if (node == JSON_INVALID_NODE || !JSON_GetFloat(node, z)) return false;
 
     if (x < -100000.0 || x > 100000.0 ||
         y < -100000.0 || y > 100000.0 ||
