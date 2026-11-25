@@ -132,8 +132,7 @@ export class PermissionEngine {
       const isAllowlisted =
         context.autoAllowedToolIds?.includes(tool.id) === true;
       const isLowRisk = tool.risk === "low";
-      const isNonDestructive =
-        tool.effect === "mutate" || tool.effect === "draft";
+      const isNonDestructive = tool.effect === "mutate";
 
       if (!isAllowlisted || !isLowRisk || !isNonDestructive) {
         // High-impact actions still require a verified approval receipt.
