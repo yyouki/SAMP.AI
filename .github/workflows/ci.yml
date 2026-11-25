@@ -1,15 +1,18 @@
-name: CI
+name: CI and Release
 
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   validate:
+    name: Validate TypeScript core
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -19,6 +22,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
       - name: Install dependencies
         run: npm install --ignore-scripts --no-audit --no-fund
@@ -31,3 +35,105 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Upload TypeScript build
+        uses: actions/upload-artifact@v4
+        with:
+          name: samp-ai-dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  build-pawn:
+    name: Compile SA-MP and open.mp filterscripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install 32-bit runtime libraries for Pawn compiler
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install --yes libc6:i386 libstdc++6:i386
+
+      - name: Compile both Pawn targets
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+        run: bash scripts/build-pawn.sh "$RUNNER_TEMP/samp-ai-pawn-artifacts"
+
+      - name: Upload Pawn build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: samp-ai-pawn-build
+          path: ${{ runner.temp }}/samp-ai-pawn-artifacts/
+          if-no-files-found: error
+          retention-days: 30
+
+  publish-release:
+    name: Package and publish GitHub Release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [validate, build-pawn]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download TypeScript build
+        uses: actions/download-artifact@v4
+        with:
+          name: samp-ai-dist
+          path: release-stage/samp-ai/dist
+
+      - name: Download compiled Pawn adapters
+        uses: actions/download-artifact@v4
+        with:
+          name: samp-ai-pawn-build
+          path: release-stage/samp-ai/adapters/pawn/build
+
+      - name: Assemble release packages
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          set -Eeuo pipefail
+          STAGE="$RUNNER_TEMP/release-stage"
+          mkdir -p "$STAGE/samp-ai/adapters/pawn/source" "$STAGE/samp-ai/docs"
+
+          cp package.json "$STAGE/samp-ai/"
+          cp README.md "$STAGE/samp-ai/"
+          cp -R schemas "$STAGE/samp-ai/"
+          cp adapters/pawn/samp_ai_adapter.pwn adapters/pawn/samp_ai_adapter.example.json "$STAGE/samp-ai/adapters/pawn/source/"
+          cp -R docs "$STAGE/samp-ai/"
+          cp scripts/build-pawn.sh "$STAGE/samp-ai/"
+
+          cat > "$STAGE/samp-ai/RELEASE-MANIFEST.txt" <<EOF
+          SAMP.AI $RELEASE_VERSION
+          Source commit: $RELEASE_COMMIT
+          Build: GitHub Actions
+          Pawn targets: SA-MP and open.mp
+          Compiled Pawn artifacts: adapters/pawn/build/
+          TypeScript output: dist/
+          This is a reference integration bundle, not a complete hosted AI application.
+          EOF
+
+          cd "$STAGE"
+          zip -qr "$GITHUB_WORKSPACE/samp-ai-$RELEASE_VERSION.zip" samp-ai
+          tar -czf "$GITHUB_WORKSPACE/samp-ai-$RELEASE_VERSION.tar.gz" samp-ai
+          cd "$GITHUB_WORKSPACE"
+          sha256sum "samp-ai-$RELEASE_VERSION.zip" "samp-ai-$RELEASE_VERSION.tar.gz" > "samp-ai-$RELEASE_VERSION.sha256"
+
+      - name: Publish release and attach build artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            samp-ai-${{ github.ref_name }}.zip
+            samp-ai-${{ github.ref_name }}.tar.gz
+            samp-ai-${{ github.ref_name }}.sha256
+            release-stage/samp-ai/adapters/pawn/build/samp/samp_ai_adapter.amx
+            release-stage/samp-ai/adapters/pawn/build/openmp/samp_ai_adapter.amx
+            release-stage/samp-ai/adapters/pawn/build/build-info.txt
