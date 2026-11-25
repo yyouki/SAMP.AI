@@ -60,6 +60,7 @@ const createObjectAction: AdapterActionDefinition = {
       object_id: { type: "string", minLength: 1, maxLength: 100 },
       project_id: { type: "string", minLength: 1, maxLength: 100 },
       model_id: { type: "integer", minimum: 1, maximum: 65535 },
+      runtime_object_id: { type: "integer", minimum: 0, maximum: 65535 },
       position: vectorSchema,
       rotation: vectorSchema,
       interior_id: { type: "integer", minimum: 0, maximum: 255 },
